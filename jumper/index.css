@@ -1,0 +1,21 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+canvas {
+  inset: 0;
+  margin: auto;
+  position: fixed;
+  background: #f0f0f0;
+  border: 2px solid black;
+}
+
+#score {
+  top: 10px;
+  left: 10px;
+  position: fixed;
+  font-weight: bolder;
+  font-size: xx-large;
+}
