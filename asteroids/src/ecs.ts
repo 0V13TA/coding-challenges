@@ -1,17 +1,70 @@
-type Entity = number;
+export type Entity = number;
 export type TransformComponent = {
   x: number;
   y: number;
-  dir: number; // Degrees
-  canWarp: boolean;
+  rotation: number; // Current facing angle in radians or degrees
 };
-export type RenderComponent = { radius: number; color: string };
 
+export type VelocityComponent = {
+  x: number; // Speed along X axis
+  y: number; // Speed along Y axis
+  angular: number; // Speed of rotation (degrees/rads per second)
+  drag: number; // Friction coefficient (e.g., 0.99 for smooth space drift)
+};
+
+export type PlayerComponent = {
+  thrustSpeed: number;
+  rotationSpeed: number;
+  fireCooldown: number; // Time remaining until the next shot can be fired
+};
+
+export type AsteroidComponent = {
+  size: "large" | "medium" | "small";
+  scoreValue: number;
+};
+
+export type BulletComponent = {
+  lifetime: number; // Time left before self-destruction (seconds)
+};
+
+export type ColliderComponent = {
+  radius: number;
+  mask: "player" | "asteroid" | "bullet";
+};
+
+type RenderComponent = {
+  color: string;
+};
+
+export type HealthComponent = {
+  lives: number;
+  invulnerableTime: number; // Seconds left of invulnerability after spawning/hit
+};
+
+export type ParticleComponent = {
+  lifetime: number;
+  maxLifetime: number; // Used to calculate alpha fading
+};
+
+export type UIContextComponent = {
+  score: number;
+  highScore: number;
+  isGameOver: boolean;
+};
+
+// Update your registry interface
 interface ComponentRegistry {
+  player: PlayerComponent;
+  bullet: BulletComponent;
   render: RenderComponent;
+  health: HealthComponent;
+  velocity: VelocityComponent;
+  asteroid: AsteroidComponent;
+  collider: ColliderComponent;
+  particle: ParticleComponent;
   transform: TransformComponent;
+  uiContext: UIContextComponent;
 }
-
 export class Registry {
   private components: Map<keyof ComponentRegistry, SparseSet<any>> = new Map();
 
@@ -86,7 +139,7 @@ export class Registry {
 
     for (let i = 0; i < smallestSet.entities.length; i++) {
       const entity = smallestSet.entities[i];
-      const [index, _] = EntityManager.extractInfoFromEntityID(entity);
+      const index = entity >>> 12;
 
       const existInAll = otherSets.every(
         (set) => set.sparse[index] !== null && set.sparse[index] !== undefined,

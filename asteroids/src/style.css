@@ -5,6 +5,13 @@
   box-sizing: border-box;
 }
 
+body {
+  color: #fff;
+  background: #000;
+  overflow: hidden;
+  font-family: "Press Start 2P", cursive;
+}
+
 canvas {
   background: #000;
 }
