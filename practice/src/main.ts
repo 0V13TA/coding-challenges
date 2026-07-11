@@ -18,6 +18,39 @@ const vertices = new Float32Array([
    0.0,  0.5, 0.0
 ]);
 
+/**
+ * Interleaved Vertex Data:
+ * [X, Y, Z,   R, G, B]
+ */
+// prettier-ignore
+export const cubeVertices = new Float32Array([
+  // Front face corners
+  -0.5, -0.5,  0.5,    1.0, 0.0, 0.0, // 0: Bottom-left  (Red)
+   0.5, -0.5,  0.5,    0.0, 1.0, 0.0, // 1: Bottom-right (Green)
+   0.5,  0.5,  0.5,    0.0, 0.0, 1.0, // 2: Top-right    (Blue)
+  -0.5,  0.5,  0.5,    1.0, 1.0, 0.0, // 3: Top-left     (Yellow)
+
+  // Back face corners
+  -0.5, -0.5, -0.5,    1.0, 0.0, 1.0, // 4: Bottom-left  (Magenta)
+   0.5, -0.5, -0.5,    0.0, 1.0, 1.0, // 5: Bottom-right (Cyan)
+   0.5,  0.5, -0.5,    1.0, 1.0, 1.0, // 6: Top-right    (White)
+  -0.5,  0.5, -0.5,    0.0, 0.0, 0.0, // 7: Top-left     (Black)
+]);
+
+/**
+ * Indices mapping the 8 vertices to 12 triangles (36 indices total).
+ * Winding order is Counter-Clockwise (CCW).
+ */
+// prettier-ignore
+export const cubeIndices = new Uint16Array([
+  0, 1, 2,   2, 3, 0, // Front face
+  1, 5, 6,   6, 2, 1, // Right face
+  5, 4, 7,   7, 6, 5, // Back face
+  4, 0, 3,   3, 7, 4, // Left face
+  3, 2, 6,   6, 7, 3, // Top face
+  4, 5, 1,   1, 0, 4  // Bottom face
+]);
+
 const vao = gl.createVertexArray();
 gl.bindVertexArray(vao);
 
