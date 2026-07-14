@@ -16,6 +16,8 @@ export type PlayerComponent = {
   thrustSpeed: number;
   rotationSpeed: number;
   fireCooldown: number; // Time remaining until the next shot can be fired
+  hasGreaterBullet?: boolean;
+  greaterBulletTimer?: number;
 };
 
 export type AsteroidComponent = {
@@ -29,7 +31,7 @@ export type BulletComponent = {
 
 export type ColliderComponent = {
   radius: number;
-  mask: "player" | "asteroid" | "bullet";
+  mask: "player" | "asteroid" | "bullet" | "powerUp";
 };
 
 type RenderComponent = {
@@ -52,6 +54,11 @@ export type UIContextComponent = {
   isGameOver: boolean;
 };
 
+// 3. Redefine PowerUPComponent as an object so it can hold a lifetime
+export type PowerUPComponent = {
+  type: "INVULNERABILITY" | "GREATER_BULLET" | "PLUS_1_LIFE";
+  lifetime: number;
+};
 // Update your registry interface
 interface ComponentRegistry {
   player: PlayerComponent;
@@ -64,6 +71,7 @@ interface ComponentRegistry {
   particle: ParticleComponent;
   transform: TransformComponent;
   uiContext: UIContextComponent;
+  powerUp: PowerUPComponent;
 }
 export class Registry {
   private components: Map<keyof ComponentRegistry, SparseSet<any>> = new Map();

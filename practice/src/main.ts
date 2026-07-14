@@ -43,7 +43,7 @@ export const cubeVertices = new Float32Array([
  */
 // prettier-ignore
 export const cubeIndices = new Uint16Array([
-  0, 1, 2,   2, 3, 0, // Front face
+  0, 1, 2,   0, 2, 3, // Front face
   1, 5, 6,   6, 2, 1, // Right face
   5, 4, 7,   7, 6, 5, // Back face
   4, 0, 3,   3, 7, 4, // Left face
@@ -54,21 +54,51 @@ export const cubeIndices = new Uint16Array([
 const vao = gl.createVertexArray();
 gl.bindVertexArray(vao);
 
-const vbo = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+// const vbo = gl.createBuffer();
+// gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+// gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+// gl.vertexAttribPointer(
+//   0,
+//   3,
+//   gl.FLOAT,
+//   false,
+//   3 * Float32Array.BYTES_PER_ELEMENT,
+//   0,
+// );
+// gl.enableVertexAttribArray(0);
+// gl.bindBuffer(gl.ARRAY_BUFFER, null);
+//
+const cubeBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, cubeBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, cubeVertices, gl.STATIC_DRAW);
+
+const elementBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementBuffer);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, cubeIndices, gl.STATIC_DRAW);
+
 gl.vertexAttribPointer(
   0,
   3,
   gl.FLOAT,
   false,
-  3 * Float32Array.BYTES_PER_ELEMENT,
+  6 * Float32Array.BYTES_PER_ELEMENT,
   0,
 );
-gl.enableVertexAttribArray(0);
-gl.bindBuffer(gl.ARRAY_BUFFER, null);
-gl.bindVertexArray(null);
+gl.vertexAttribPointer(
+  1,
+  3,
+  gl.FLOAT,
+  false,
+  6 * Float32Array.BYTES_PER_ELEMENT,
+  3 * Float32Array.BYTES_PER_ELEMENT,
+);
 
+gl.enableVertexAttribArray(0);
+gl.enableVertexAttribArray(1);
+
+gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+gl.bindVertexArray(null);
 const program = loadShaders(gl, vertexShaderSource, fragmentShaderSource)!;
 gl.useProgram(program);
 
@@ -97,6 +127,7 @@ gl.uniformMatrix4fv(projMatrixUniformLocation, false, projectionMatrix);
 // gl.enable(gl.CULL_FACE);
 // gl.cullFace(gl.BACK);
 
+gl.enable(gl.DEPTH_TEST);
 // --- Execution Loop ---
 let lastTime = 0;
 let angle = 0;
@@ -118,7 +149,8 @@ function animate(currentTime: number) {
 
   glm.mat4.rotate(worldMatrix, identityMatrix, angle, [0, 1, 0]);
   gl.uniformMatrix4fv(worldMatrixUniformLocation, false, worldMatrix);
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.drawElements(gl.TRIANGLES, cubeVertices.length, gl.UNSIGNED_BYTE, 0);
   gl.bindVertexArray(null);
   requestAnimationFrame(animate);
 }

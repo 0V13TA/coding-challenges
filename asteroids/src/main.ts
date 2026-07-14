@@ -12,6 +12,7 @@ import {
   applyScreenShake,
   triggerScreenShake,
   uiRenderSystem,
+  powerUpSystem,
 } from "./systems";
 
 const canvas = document.createElement("canvas");
@@ -30,7 +31,8 @@ world.createComponent("collider");
 world.createComponent("render");
 world.createComponent("health");
 world.createComponent("particle");
-world.createComponent("uiContext"); // Create the component pool
+world.createComponent("uiContext");
+world.createComponent("powerUp");
 
 // Track keyboard state
 const keys: Record<string, boolean> = {};
@@ -63,6 +65,35 @@ function spawnPlayer() {
   world.addData(player, "collider", { radius: 12, mask: "player" });
   world.addData(player, "render", { color: "#00ffcc" });
   world.addData(player, "health", { lives: 3, invulnerableTime: 2.5 });
+}
+
+function spawnPowerUp(x: number, y: number) {
+  const powerUp = world.createEntity();
+  const types: Array<"INVULNERABILITY" | "GREATER_BULLET" | "PLUS_1_LIFE"> = [
+    "INVULNERABILITY",
+    "GREATER_BULLET",
+    "PLUS_1_LIFE",
+  ];
+  const type = types[Math.floor(Math.random() * types.length)];
+
+  // Color mapping based on type
+  const color =
+    type === "PLUS_1_LIFE"
+      ? "#ff3366"
+      : type === "INVULNERABILITY"
+        ? "#00ffcc"
+        : "#ffff00";
+
+  world.addData(powerUp, "transform", { x, y, rotation: Math.random() * 360 });
+  world.addData(powerUp, "velocity", {
+    x: (Math.random() - 0.5) * 50,
+    y: (Math.random() - 0.5) * 50,
+    angular: 45,
+    drag: 1.0,
+  });
+  world.addData(powerUp, "powerUp", { type, lifetime: 12 }); // Disappears in 12s
+  world.addData(powerUp, "collider", { radius: 8, mask: "powerUp" });
+  world.addData(powerUp, "render", { color });
 }
 
 function spawnBullet(x: number, y: number, angleDeg: number) {
@@ -220,6 +251,7 @@ function animate(currentTime: number) {
   bulletLifetimeSystem(world, dt);
   healthSystem(world, dt);
   particleSystem(world, dt);
+  powerUpSystem(world, dt);
 
   // 2. Process Game Rules / Collisions
   collisionSystem(
@@ -247,9 +279,15 @@ function animate(currentTime: number) {
       if (astData.size === "large") {
         spawnAsteroid(pos.x, pos.y, "medium");
         spawnAsteroid(pos.x, pos.y, "medium");
+
+        // Add a 20% chance to drop a power-up from large asteroids
+        if (Math.random() < 1.0) spawnPowerUp(pos.x, pos.y);
       } else if (astData.size === "medium") {
         spawnAsteroid(pos.x, pos.y, "small");
         spawnAsteroid(pos.x, pos.y, "small");
+
+        // Add a 10% chance to drop a power-up from large asteroids
+        if (Math.random() < 1.0) spawnPowerUp(pos.x, pos.y);
       }
 
       world.destroyEntity(asteroid);
@@ -276,6 +314,25 @@ function animate(currentTime: number) {
 
         health.invulnerableTime = 2.0;
       }
+    },
+    (player, powerUp) => {
+      const pData = world.getData(powerUp, "powerUp")!;
+      const playerComp = world.getData(player, "player")!;
+      const healthComp = world.getData(player, "health")!;
+      const pos = world.getData(powerUp, "transform")!;
+
+      if (pData.type === "PLUS_1_LIFE") {
+        healthComp.lives++;
+      } else if (pData.type === "INVULNERABILITY") {
+        healthComp.invulnerableTime = 5.0; // 5 seconds of shield
+      } else if (pData.type === "GREATER_BULLET") {
+        playerComp.hasGreaterBullet = true;
+        playerComp.greaterBulletTimer = 10.0; // 10 seconds of multi-shot
+      }
+
+      // Visual feedback
+      createExplosion(pos.x, pos.y, 15, "#00ffcc");
+      world.destroyEntity(powerUp);
     },
   );
 
@@ -312,6 +369,30 @@ function animate(currentTime: number) {
       ctx.lineTo(-10, 10);
       ctx.closePath();
       ctx.stroke();
+
+      // 2. Draw Invulnerability Shield Forcefield
+      const activePlayers = world.view("player", "health");
+      if (activePlayers.length > 0) {
+        const hData = world.getData(activePlayers[0], "health");
+        if (hData && hData.invulnerableTime > 0) {
+          ctx.beginPath();
+
+          // Calculate a smooth pulsing effect between 0.3 and 0.8 alpha
+          const pulse = Math.abs(Math.sin(currentTime / 150));
+          const shieldAlpha = 0.3 + pulse * 0.5;
+
+          ctx.strokeStyle = `rgba(0, 255, 204, ${shieldAlpha})`;
+          ctx.lineWidth = 2;
+
+          // Draw a circle slightly larger than the ship's collision radius
+          ctx.arc(0, 0, radius + 6, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Add a faint translucent fill to make it pop
+          ctx.fillStyle = `rgba(0, 255, 204, ${shieldAlpha * 0.2})`;
+          ctx.fill();
+        }
+      }
     } else if (mask === "particle") {
       ctx.fillStyle = color;
       ctx.fillRect(-radius, -radius, radius * 2, radius * 2);

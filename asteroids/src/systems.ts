@@ -24,6 +24,13 @@ export function inputSystem(
       player.fireCooldown -= dt;
     }
 
+    if (player.hasGreaterBullet && player.greaterBulletTimer !== undefined) {
+      player.greaterBulletTimer -= dt;
+      if (player.greaterBulletTimer <= 0) {
+        player.hasGreaterBullet = false;
+      }
+    }
+
     // 2. Handle Rotation (Left / Right)
     let rotationDir = 0;
     if (keys["ArrowLeft"] || keys["a"]) rotationDir -= 1;
@@ -46,6 +53,12 @@ export function inputSystem(
       const noseY = transform.y + Math.sin(rad) * 15;
 
       spawnBullet(noseX, noseY, transform.rotation);
+
+      // If we have the powerup, spawn two extra flanking bullets
+      if (player.hasGreaterBullet) {
+        spawnBullet(noseX, noseY, transform.rotation - 15);
+        spawnBullet(noseX, noseY, transform.rotation + 15);
+      }
       player.fireCooldown = 0.25; // 250ms delay between shots
     }
   }
@@ -129,6 +142,7 @@ export function collisionSystem(
   world: Registry,
   onAsteroidHit: (asteroidEntity: Entity, bulletEntity: Entity) => void,
   onPlayerHit: (playerEntity: Entity) => void,
+  onPowerUpCollect: (playerEntity: Entity, powerUpEntity: Entity) => void,
 ) {
   const entities = world.view("transform", "collider");
   const len = entities.length;
@@ -173,6 +187,15 @@ export function collisionSystem(
         } else if (c1.mask === "player" && c2.mask === "asteroid") {
           onPlayerHit(e1);
           // Break the inner loop since the player was hit and moved/updated
+          break;
+        }
+
+        // 3. Player vs PowerUp
+        else if (c1.mask === "powerUp" && c2.mask === "player") {
+          onPowerUpCollect(e2, e1);
+          break;
+        } else if (c1.mask === "player" && c2.mask === "powerUp") {
+          onPowerUpCollect(e1, e2);
           break;
         }
       }
@@ -344,5 +367,22 @@ export function uiRenderSystem(ctx: CanvasRenderingContext2D, world: Registry) {
       ctx.canvas.height / 2 + 30,
     );
     ctx.restore();
+  }
+}
+
+/**
+ * 11. POWERUP SYSTEM
+ * Decrements active lifespan of power-ups that are floating in space.
+ */
+export function powerUpSystem(world: Registry, dt: number) {
+  const powerUps = world.view("powerUp");
+  for (let i = 0; i < powerUps.length; i++) {
+    const entity = powerUps[i];
+    const powerUp = world.getData(entity, "powerUp")!;
+    powerUp.lifetime -= dt;
+
+    if (powerUp.lifetime <= 0) {
+      world.destroyEntity(entity);
+    }
   }
 }
