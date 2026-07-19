@@ -1,5 +1,5 @@
 import "./style.css";
-import { loadShaders } from "./webgl";
+import { loadShaders, loadTextureAsync } from "./webgl";
 import vertexShaderSource from "./assets/shader.vert";
 import fragmentShaderSource from "./assets/shader.frag";
 import * as glm from "gl-matrix";
@@ -11,12 +11,20 @@ canvas.height = window.innerHeight;
 gl.viewport(0, 0, canvas.width, canvas.height);
 document.querySelector("#app")?.append(canvas);
 
-// prettier-ignore
-const vertices = new Float32Array([
-  -0.5, -0.5, 0.0,
-   0.5, -0.5, 0.0,
-   0.0,  0.5, 0.0
-]);
+onresize = () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+
+  glm.mat4.perspective(
+    projectionMatrix,
+    glm.glMatrix.toRadian(45),
+    canvas.width / canvas.height,
+    0.1,
+    1000,
+  );
+  gl.uniformMatrix4fv(projMatrixUniformLocation, false, projectionMatrix);
+};
 
 /**
  * Interleaved Vertex Data:
@@ -54,20 +62,6 @@ export const cubeIndices = new Uint16Array([
 const vao = gl.createVertexArray();
 gl.bindVertexArray(vao);
 
-// const vbo = gl.createBuffer();
-// gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-// gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-// gl.vertexAttribPointer(
-//   0,
-//   3,
-//   gl.FLOAT,
-//   false,
-//   3 * Float32Array.BYTES_PER_ELEMENT,
-//   0,
-// );
-// gl.enableVertexAttribArray(0);
-// gl.bindBuffer(gl.ARRAY_BUFFER, null);
-//
 const cubeBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, cubeBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, cubeVertices, gl.STATIC_DRAW);
@@ -111,7 +105,7 @@ let worldMatrix = new Float32Array(16),
   projectionMatrix = new Float32Array(16);
 
 glm.mat4.identity(worldMatrix);
-glm.mat4.lookAt(viewMatrix, [0, 0, -2], [0, 0, 0], [0, 1, 0]);
+glm.mat4.lookAt(viewMatrix, [0, 0, -5], [0, 0, 0], [0, 1, 0]);
 glm.mat4.perspective(
   projectionMatrix,
   glm.glMatrix.toRadian(45),
@@ -124,16 +118,26 @@ gl.uniformMatrix4fv(viewMatrixUniformLocation, false, viewMatrix);
 gl.uniformMatrix4fv(worldMatrixUniformLocation, false, worldMatrix);
 gl.uniformMatrix4fv(projMatrixUniformLocation, false, projectionMatrix);
 
-// gl.enable(gl.CULL_FACE);
-// gl.cullFace(gl.BACK);
+gl.enable(gl.CULL_FACE);
+gl.cullFace(gl.BACK);
 
 gl.enable(gl.DEPTH_TEST);
-// --- Execution Loop ---
+
 let lastTime = 0;
 let angle = 0;
 
 let identityMatrix = new Float32Array(16);
 glm.mat4.identity(identityMatrix);
+
+let myTexture: WebGLTexture | null = null;
+async function init() {
+  try {
+    myTexture = await loadTextureAsync(gl, "/assets/wood.png");
+    requestAnimationFrame(animate);
+  } catch (error) {
+    console.error("Initialization Failed:", error);
+  }
+}
 
 function animate(currentTime: number) {
   if (!lastTime) lastTime = currentTime;
@@ -147,12 +151,15 @@ function animate(currentTime: number) {
 
   angle += (dt / 6) * 2 * Math.PI;
 
-  glm.mat4.rotate(worldMatrix, identityMatrix, angle, [0, 1, 0]);
+  glm.mat4.rotate(worldMatrix, identityMatrix, angle, [1, 1, 0]);
   gl.uniformMatrix4fv(worldMatrixUniformLocation, false, worldMatrix);
-  // gl.drawArrays(gl.TRIANGLES, 0, 3);
-  gl.drawElements(gl.TRIANGLES, cubeVertices.length, gl.UNSIGNED_BYTE, 0);
+  if (myTexture) {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, myTexture);
+  }
+  gl.drawElements(gl.TRIANGLES, cubeIndices.length, gl.UNSIGNED_SHORT, 0);
   gl.bindVertexArray(null);
   requestAnimationFrame(animate);
 }
 
-requestAnimationFrame(animate);
+init();

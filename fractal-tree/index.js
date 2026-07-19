@@ -1,153 +1,160 @@
 // @ts-check
 "use strict";
 
-/**
- * @typedef Timer
- * @property {number} id
- * @property {number} elapsed
- * @property {boolean} paused
- * @property {boolean} repeat
- * @property {number} interval
- * @property {() => void} callback
- */
+/** @typedef {[number, number, number, number, number, number]} BranchQueueItem */
 
-//#region Init
 const canvas = document.createElement("canvas");
 const ctx = canvas.getContext("2d");
-
+if (!ctx) throw new Error("Canvas context 2D not supported");
 document.body.appendChild(canvas);
 
-canvas.width = window.innerWidth * 0.99;
-canvas.height = window.innerHeight * 0.99;
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.onresize = resize;
+resize();
 
-let animationID;
+const DEG2RAD = Math.PI / 180;
+
+// Config state read directly from UI
+const config = {
+  angleOffset: 25,
+  startingAngle: -90,
+  trunkLengthPct: 0.25,
+  maxDepth: 11,
+  branchesPerSecond: 40,
+};
+
+/**
+ * @typedef {Object} Branch
+ * @property {[number, number]} start
+ * @property {[number, number]} end
+ * @property {number} thickness
+ * @property {number} depth
+ */
+
+/** @type {Branch[]} */
+let allBranches = [];
+let visibleBranchCount = 0;
 let lastTime = 0;
-//#endregion
+let growthProgress = 0;
 
-// --- Timer Manager ---
-const TimerManager = {
-  /** @type {Timer[]} */
-  timers: [],
-  counterId: 0,
+/**
+ * Builds tree layout using Breadth-First Search (BFS)
+ */
+function generateTreeBFS() {
+  allBranches = [];
+  growthProgress = 0;
+  visibleBranchCount = 0;
 
-  /**
-   * @param {number} interval
-   * @param {() => void} callback
-   * @param {boolean} [repeat=true]
-   */
-  add(interval, callback, repeat = true) {
-    const id = this.counterId++;
-    this.timers.push({
-      id,
-      interval,
-      callback,
-      elapsed: 0,
-      paused: false,
-      repeat,
-    });
-    return id;
-  },
+  const startX = canvas.width / 2;
+  const startY = canvas.height;
+  const initialLength = canvas.height * config.trunkLengthPct;
+  const initialThickness = 18;
+  const startAngleRad = config.startingAngle * DEG2RAD;
+  const offsetRad = config.angleOffset * DEG2RAD;
 
-  /**
-   * @param {number} interval
-   * @param {() => void} callback
-   */
-  setInterval(interval, callback) {
-    return this.add(interval, callback, true);
-  },
+  /** @type {BranchQueueItem[]} */
+  const queue = [
+    [startX, startY, initialLength, startAngleRad, initialThickness, 0],
+  ];
 
-  /**
-   * @param {number} dt
-   */
-  update(dt) {
-    for (let i = this.timers.length - 1; i >= 0; i--) {
-      const t = this.timers[i];
-      if (t.paused) continue;
+  while (queue.length > 0) {
+    const shiftedQueue = queue.shift();
+    if (!shiftedQueue) break;
+    const [x, y, len, angle, thick, depth] = shiftedQueue;
 
-      t.elapsed += dt;
-      if (t.elapsed >= t.interval) {
-        t.callback();
-        if (t.repeat) {
-          t.elapsed -= t.interval;
-        } else {
-          this.timers.splice(i, 1);
-        }
-      }
-    }
-  },
+    if (depth >= config.maxDepth || len < 2) continue;
 
-  clearAll() {
-    this.timers = [];
-    this.counterId = 0;
-  },
-};
+    const endX = x + len * Math.cos(angle);
+    const endY = y + len * Math.sin(angle);
 
-// --- Input Handling ---
-const Input = {
-  /** @type {Set<string>} */
-  held: new Set(),
-  /** @type {Set<string>} */
-  pressed: new Set(),
-  /** @type {Set<string>} */
-  released: new Set(),
-  init() {
-    window.addEventListener("keydown", (e) => {
-      if (!this.held.has(e.code)) {
-        this.pressed.add(e.code);
-      }
-      this.held.add(e.code);
+    allBranches.push({
+      start: [x, y],
+      end: [endX, endY],
+      thickness: thick,
+      depth,
     });
 
-    window.addEventListener("keyup", (e) => {
-      this.held.delete(e.code);
-      this.released.add(e.code);
-    });
-  },
+    const nextLen = len * 0.72;
+    const nextThick = thick * 0.7;
 
-  /** @param {string} key  */
-  isHeld(key) {
-    return this.held.has(key);
-  },
-
-  /** @param {string} key  */
-  isPressed(key) {
-    return this.pressed.has(key);
-  },
-
-  /** @param {string} key  */
-  isReleased(key) {
-    return this.released.has(key);
-  },
-
-  endFrame() {
-    this.pressed.clear();
-    this.released.clear();
-  },
-};
-
-function initGame() {
-  TimerManager.clearAll();
-  lastTime = 0;
-  animationID = requestAnimationFrame(animate);
+    queue.push([endX, endY, nextLen, angle - offsetRad, nextThick, depth + 1]);
+    queue.push([endX, endY, nextLen, angle + offsetRad, nextThick, depth + 1]);
+  }
 }
 
-/** @param {number} currentTime   */
+// Attach UI Event Listeners
+function setupUI() {
+  const getEl = (/** @type {string} */ id) =>
+    /** @type {HTMLInputElement} */ (document.getElementById(id));
+
+  /**
+   * @param {string} id
+   * @param {string} valId
+   * @param {keyof config} key
+   * @param {(v: number) => number} [transform]
+   **/
+  const bindInput = (id, valId, key, transform = (v) => v) => {
+    const input = getEl(id);
+    const display = document.getElementById(valId);
+    input.addEventListener("input", () => {
+      const val = Number(input.value);
+      if (display) display.textContent = String(val);
+      config[key] = transform(val);
+      generateTreeBFS();
+    });
+  };
+
+  bindInput("angleOffset", "angleOffsetVal", "angleOffset");
+  bindInput("startingAngle", "startingAngleVal", "startingAngle");
+  bindInput("trunkLength", "trunkLengthVal", "trunkLengthPct", (v) => v / 100);
+  bindInput("maxDepth", "maxDepthVal", "maxDepth");
+  bindInput("growthSpeed", "growthSpeedVal", "branchesPerSecond");
+
+  const btnRestart = document.getElementById("btnRestart");
+  if (btnRestart) {
+    btnRestart.addEventListener("click", () => generateTreeBFS());
+  }
+}
+
+// Init UI & Tree
+setupUI();
+generateTreeBFS();
+
+/** @param {number} currentTime */
 function animate(currentTime) {
   if (!lastTime) lastTime = currentTime;
   const dt = Math.min((currentTime - lastTime) / 1000, 0.1);
   lastTime = currentTime;
 
-  TimerManager.update(currentTime - (lastTime - dt * 1000));
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (visibleBranchCount < allBranches.length) {
+    growthProgress += dt * config.branchesPerSecond;
+    visibleBranchCount = Math.floor(growthProgress);
+  }
 
-  // Background/canvas placeholder draw loop
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (ctx) {
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  Input.endFrame();
-  animationID = requestAnimationFrame(animate);
+    const countToDraw = Math.min(visibleBranchCount, allBranches.length);
+
+    for (let i = 0; i < countToDraw; i++) {
+      const branch = allBranches[i];
+      ctx.beginPath();
+      ctx.moveTo(branch.start[0], branch.start[1]);
+      ctx.lineTo(branch.end[0], branch.end[1]);
+
+      const greenRatio = Math.min(branch.depth / config.maxDepth, 1);
+      ctx.strokeStyle = `rgb(${100 - greenRatio * 60}, ${70 + greenRatio * 110}, 50)`;
+      ctx.lineWidth = branch.thickness;
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+  }
+
+  requestAnimationFrame(animate);
 }
 
-// Global execution hooks
-Input.init();
-animationID = requestAnimationFrame(animate);
+requestAnimationFrame(animate);

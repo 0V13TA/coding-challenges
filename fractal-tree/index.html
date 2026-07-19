@@ -7,5 +7,53 @@
     <script src="index.js" type="module" defer></script>
     <title>Fractal Tree - OVIETA</title>
   </head>
-  <body></body>
+  <body>
+    <!-- UI Control Panel -->
+    <div class="controls-panel">
+      <h2>Tree Settings</h2>
+
+      <div class="control-group">
+        <label for="angleOffset"
+          >Angle Offset: <span id="angleOffsetVal">25</span>°</label
+        >
+        <input type="range" id="angleOffset" min="5" max="90" value="25" />
+      </div>
+
+      <div class="control-group">
+        <label for="startingAngle"
+          >Start Angle: <span id="startingAngleVal">-90</span>°</label
+        >
+        <input
+          type="range"
+          id="startingAngle"
+          min="-180"
+          max="180"
+          value="-90"
+        />
+      </div>
+
+      <div class="control-group">
+        <label for="trunkLength"
+          >Trunk Length: <span id="trunkLengthVal">25</span>%</label
+        >
+        <input type="range" id="trunkLength" min="10" max="40" value="25" />
+      </div>
+
+      <div class="control-group">
+        <label for="maxDepth"
+          >Max Depth: <span id="maxDepthVal">11</span></label
+        >
+        <input type="range" id="maxDepth" min="1" max="14" value="11" />
+      </div>
+
+      <div class="control-group">
+        <label for="growthSpeed"
+          >Growth Speed: <span id="growthSpeedVal">40</span>/s</label
+        >
+        <input type="range" id="growthSpeed" min="5" max="300" value="40" />
+      </div>
+
+      <button id="btnRestart">Restart Growth</button>
+    </div>
+  </body>
 </html>
