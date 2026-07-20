@@ -3,6 +3,7 @@ import { loadShaders, loadTextureAsync } from "./webgl";
 import vertexShaderSource from "./assets/shader.vert";
 import fragmentShaderSource from "./assets/shader.frag";
 import * as glm from "gl-matrix";
+import { GltfImporter } from "./gltf-loaders";
 
 const canvas = document.createElement("canvas");
 const gl = canvas.getContext("webgl2") as WebGL2RenderingContext;
@@ -161,5 +162,25 @@ function animate(currentTime: number) {
   gl.bindVertexArray(null);
   requestAnimationFrame(animate);
 }
+
+const importer = new GltfImporter();
+const asset = await importer.import("/Horse.glb");
+
+// Traverse scene graph nodes cleanly using numeric handles
+asset.scenes[0].nodes.forEach((nodeHandle) => {
+  const node = asset.nodes[nodeHandle];
+  console.log(`Node: ${node.name || node.id}`);
+
+  if (node.meshHandle !== undefined) {
+    const mesh = asset.meshes[node.meshHandle];
+
+    mesh.primitives.forEach((primHandle) => {
+      const primitive = asset.primitives[primHandle];
+      console.log(
+        `Rendering primitive ${primitive.id} with ${primitive.positions.data.length} floats`,
+      );
+    });
+  }
+});
 
 init();
