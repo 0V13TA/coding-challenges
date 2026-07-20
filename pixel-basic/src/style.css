@@ -1,0 +1,164 @@
+:root {
+  /* Default PIXEL BASIC Palette */
+  --color-keyword: #0000ff; /* Classic Blue */
+  --color-function: #800080; /* Deep Purple */
+  --color-variable: #008080; /* Teal */
+  --color-comment: #008000; /* DOS Green */
+  --color-operator: #d10000; /* Crimson */
+  --color-literal: #a52a2a; /* Burnt Orange */
+  --color-text: #000000; /* Default Black */
+  --color-bg: rgba(255, 255, 255, 0.92); /* Editor Background */
+}
+
+.token-keyword {
+  color: var(--color-keyword);
+  font-weight: bold;
+}
+.token-function {
+  color: var(--color-function);
+  font-weight: bold;
+}
+.token-variable {
+  color: var(--color-variable);
+}
+.token-comment {
+  color: var(--color-comment);
+  font-style: italic;
+}
+.token-operator {
+  color: var(--color-operator);
+}
+.token-literal {
+  color: var(--color-literal);
+}
+
+.command {
+  color: var(--color-text);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  font-family: monospace;
+  box-sizing: border-box;
+  background-color: #1a1a1a;
+}
+
+/* ----------------------------------
+   Canvas Layer
+----------------------------------- */
+#graphics-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background-color: var(--color-bg);
+}
+
+/* ----------------------------------
+   UI Overlay Layer
+----------------------------------- */
+#ui-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50vw; /* Exact half screen */
+  height: 100vh;
+  z-index: 10; /* Sits on top of the canvas */
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-sizing: border-box;
+  pointer-events: none; /* Let clicks pass through empty space to the canvas */
+}
+
+h1 {
+  margin: 0 0 15px 0;
+  font-size: 2.5rem;
+  color: #f11; /* Changed to white for contrast against dark canvas */
+  text-shadow: 2px 2px 0 #000; /* Retro shadow */
+  pointer-events: auto; /* Re-enable clicks */
+}
+
+/* Layout Container */
+#editor-container {
+  flex: 1;
+  border: 2px solid #000;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg); /* Slight transparency */
+  box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.5); /* Retro block shadow for depth */
+  pointer-events: auto; /* Re-enable clicks for the editor */
+  backdrop-filter: blur(
+    2px
+  ); /* Extra finesse: blurs the canvas slightly under the editor */
+}
+
+/* Display Area */
+#commands-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+/* Individual Line Grid */
+.command-line {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  border-bottom: 1px solid #ddd;
+  min-height: 36px;
+  align-items: center;
+}
+
+.line-number {
+  border-right: 2px solid #000;
+  text-align: center;
+  font-weight: bold;
+  background-color: rgba(240, 240, 240, 0.9);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.command {
+  padding-left: 15px;
+  font-size: 1.1rem;
+}
+
+/* Input Form */
+#input-form {
+  display: flex;
+  border-top: 2px solid #000;
+  background: #fff;
+}
+
+#input {
+  flex: 1;
+  border: none;
+  padding: 12px 16px;
+  font-family: inherit;
+  font-size: 1.1rem;
+  outline: none;
+}
+
+#submit-button {
+  border: none;
+  border-left: 2px solid #000;
+  background: transparent;
+  padding: 0 24px;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+#submit-button:hover {
+  background: #f0f0f0;
+}
