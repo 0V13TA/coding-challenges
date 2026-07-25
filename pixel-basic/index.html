@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PIXEL BASIC</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Full-screen Canvas Background -->
+      <canvas id="graphics-canvas"></canvas>
+
+      <!-- Overlay UI -->
+      <div id="ui-overlay">
+        <h1>PIXEL BASIC</h1>
+
+        <div id="editor-container">
+          <!-- The fixed viewport list -->
+          <div id="commands-container">
+            <!-- Rendered lines go here dynamically -->
+          </div>
+
+          <!-- Bottom input bar -->
+          <form id="input-form">
+            <input
+              type="text"
+              id="input"
+              placeholder='10 PRINT "HELLO WORLD"'
+              autocomplete="off"
+              autofocus
+            />
+            <button type="submit" id="submit-button">&rightarrow;</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
