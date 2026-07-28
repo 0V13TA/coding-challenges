@@ -25,7 +25,7 @@ const pixelBasic = `LET dan = "FISH"
 CONST number = 20.003
 
 WHILE number < 40 THEN
-  dan = "NOT '  40"
+  dan = "NOT ' \\"  40"
   josh += 'tony' AND TRUE
 END WHILE
 `;

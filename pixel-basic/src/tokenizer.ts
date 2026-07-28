@@ -1,57 +1,38 @@
+// prettier-ignore
 export const KEYWORDS = [
-  "LET",
-  "REM",
-  "CONST",
+  "LET", "REM", "CONST",
 
   //
-  "DO",
-  "IF",
-  "END",
-  "SUB",
-  "THEN",
-  "ELSE",
+  "DO", "IF", "END",
+  "SUB", "THEN", "ELSE",
   "WHILE",
 
   //
-  "CASE",
-  "SWITCH",
-  "DEFAULT",
+  "CASE", "SWITCH", "DEFAULT",
 
   //
-  "BREAK",
-  "RETURN",
-  "CONTINUE",
+  "BREAK", "RETURN", "CONTINUE",
 
   //
   "SCREEN",
 ];
 
+// prettier-ignore
 const OPERATORS = [
-  "PLUS",
-  "MINUS",
-  "DIVIDE",
-  "MODULO",
-  "MULTIPLY",
+  "PLUS", "MINUS", "DIVIDE",
+  "MODULO", "MULTIPLY",
 
   //
-  "LTHAN",
-  "GTHAN",
-  "GTEQUAL",
-  "EQUALTO",
-  "LTEQUAL",
-  "NOTEQUALTO",
+  "LTHAN", "GTHAN", "GTEQUAL",
+  "EQUALTO", "LTEQUAL", "NOTEQUALTO",
 
   //
-  "DECLARATION",
-  "ADD_DECLARE",
-  "SUB_DECLARE",
-  "MULT_DECLARE",
-  "DIV_DECLARE",
-  "MOD_DECLARE",
+  "DECLARATION", "ADD_DECLARE",
+  "SUB_DECLARE", "MULT_DECLARE",
+  "DIV_DECLARE", "MOD_DECLARE",
 
   //
-  "BITWISE",
-  "LOGICAL",
+  "BITWISE", "LOGICAL",
 ];
 
 const PUNCTUATIONS = ["LBRACKET", "RBRACKET", "LPAREN", "RPAREN", "COMMA"];
@@ -105,7 +86,8 @@ export function tokenize(sourceCode: string) {
   let lexeme = "";
   let tokens = [];
   let closingDQ = false,
-    closingSQ = false; // closing double and single quotes
+    closingSQ = false,
+    escapeMode = false; // closing double and single quotes
   for (let i = 0; i < sourceCode.length; i++) {
     const char = sourceCode[i];
 
@@ -116,11 +98,20 @@ export function tokenize(sourceCode: string) {
     }
 
     if (closingSQ && char !== "'") {
+      if (char == "\\") {
+        escapeMode = true;
+        continue;
+      }
       lexeme += char;
       continue;
     }
 
     if (char === "'" && closingSQ) {
+      if (escapeMode) {
+        lexeme += char;
+        escapeMode = false;
+        continue;
+      }
       closingSQ = false;
       tokens.push(`STRING ${lexeme}`);
       lexeme = "";
@@ -133,11 +124,20 @@ export function tokenize(sourceCode: string) {
     }
 
     if (closingDQ && char !== '"') {
+      if (char == "\\") {
+        escapeMode = true;
+        continue;
+      }
       lexeme += char;
       continue;
     }
 
     if (char === '"' && closingDQ) {
+      if (escapeMode) {
+        lexeme += char;
+        escapeMode = false;
+        continue;
+      }
       closingDQ = false;
       tokens.push(`STRING ${lexeme}`);
       lexeme = "";
