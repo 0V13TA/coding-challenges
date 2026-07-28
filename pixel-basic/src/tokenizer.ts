@@ -1,292 +1,271 @@
-// prettier-ignore
-export const KEYWORDS = [
-  "LET", "REM", "CONST",
+export type Token = {
+  type: string;
+  value: string;
+  line: number;
+  column: number;
+};
 
-  //
-  "DO", "IF", "END",
-  "SUB", "THEN", "ELSE",
+export type LexError = {
+  message: string;
+  line: number;
+  column: number;
+};
+
+export const KEYWORDS = new Set([
+  "LET",
+  "CONST",
+  "IF",
+  "THEN",
+  "ELSE",
   "WHILE",
-
-  //
-  "CASE", "SWITCH", "DEFAULT",
-
-  //
-  "BREAK", "RETURN", "CONTINUE",
-
-  //
+  "DO",
+  "END",
+  "SUB",
+  "RETURN",
+  "BREAK",
+  "CONTINUE",
   "SCREEN",
-];
+  "SWITCH",
+  "CASE",
+  "DEFAULT",
+]);
 
-// prettier-ignore
-const OPERATORS = [
-  "PLUS", "MINUS", "DIVIDE",
-  "MODULO", "MULTIPLY",
+const TWO_CHAR_OPERATORS: Record<string, string> = {
+  "==": "EQUALTO",
+  "!=": "NOTEQUALTO",
+  "<=": "LTEQUAL",
+  ">=": "GTEQUAL",
+  "+=": "ADD_DECLARE",
+  "-=": "SUB_DECLARE",
+  "*=": "MULT_DECLARE",
+  "/=": "DIV_DECLARE",
+  "%=": "MOD_DECLARE",
+};
 
-  //
-  "LTHAN", "GTHAN", "GTEQUAL",
-  "EQUALTO", "LTEQUAL", "NOTEQUALTO",
+const ONE_CHAR_OPERATORS: Record<string, string> = {
+  "=": "DECLARATION",
+  "+": "PLUS",
+  "-": "MINUS",
+  "*": "MULTIPLY",
+  "/": "DIVIDE",
+  "%": "MODULO",
+  "<": "LTHAN",
+  ">": "GTHAN",
+  "&": "BITWISE",
+  "|": "BITWISE",
+  "^": "BITWISE",
+  "~": "BITWISE",
+};
 
-  //
-  "DECLARATION", "ADD_DECLARE",
-  "SUB_DECLARE", "MULT_DECLARE",
-  "DIV_DECLARE", "MOD_DECLARE",
+const PUNCTUATION: Record<string, string> = {
+  "(": "LPAREN",
+  ")": "RPAREN",
+  "[": "LBRACKET",
+  "]": "RBRACKET",
+  "{": "LBRACE",
+  "}": "RBRACE",
+  ",": "COMMA",
+  ":": "COLON",
+};
 
-  //
-  "BITWISE", "LOGICAL",
-];
-
-const PUNCTUATIONS = ["LBRACKET", "RBRACKET", "LPAREN", "RPAREN", "COMMA"];
-const LITERALS = ["BOOLEAN", "ID", "STRING", "NUMBER"];
-
-export const TOKENS = [...LITERALS, ...KEYWORDS, ...OPERATORS, ...PUNCTUATIONS];
-
-function isAlpha(char: string) {
-  let firstChar = char;
-  if (char.length > 1) {
-    console.log(
-      "Invalid input only 1 character is required. Checking first character",
-    );
-    firstChar = char[0];
-  }
-
-  if (
-    (firstChar >= "A" && firstChar <= "Z") ||
-    (firstChar >= "a" && firstChar <= "z")
-  )
-    return true;
-  return false;
+function isAlpha(c: string) {
+  return /[A-Za-z]/.test(c);
 }
 
-function isNum(num: string) {
-  let foundDot = false;
-  for (const char of num) {
-    if (char === "." && !foundDot) {
-      foundDot = true;
-      continue;
-    }
-    if (isNaN(parseInt(char))) return false;
-  }
-  return true;
+function isDigit(c: string) {
+  return /[0-9]/.test(c);
 }
 
-function isValidID(id: string) {
-  const firstChar = id[0];
-  let isValid = false;
-
-  if (!(isAlpha(firstChar) || firstChar === "_")) return false;
-
-  for (const char of id) {
-    if (char === "_" || isAlpha(char) || isNum(char)) isValid = true;
-    else isValid = false;
-  }
-  return isValid;
+function isAlphaNumeric(c: string) {
+  return /[A-Za-z0-9_]/.test(c);
 }
 
-export function tokenize(sourceCode: string) {
-  let lexeme = "";
-  let tokens = [];
-  let closingDQ = false,
-    closingSQ = false,
-    escapeMode = false; // closing double and single quotes
-  for (let i = 0; i < sourceCode.length; i++) {
-    const char = sourceCode[i];
+export function tokenize(source: string): {
+  tokens: Token[];
+  errors: LexError[];
+} {
+  const tokens: Token[] = [];
+  const errors: LexError[] = [];
 
-    // Finding strings
-    if (char === "'" && closingSQ === false && closingDQ === false) {
-      closingSQ = true;
+  let i = 0;
+  let currentLine = 1;
+  let currentColumn = 1;
+
+  const advance = (amount: number = 1) => {
+    for (let step = 0; step < amount; step++) {
+      if (source[i] === "\n") {
+        currentLine++;
+        currentColumn = 1;
+      } else {
+        currentColumn++;
+      }
+      i++;
+    }
+  };
+
+  while (i < source.length) {
+    let c = source[i];
+
+    const startLine = currentLine;
+    const startCol = currentColumn;
+
+    const addToken = (type: string, value: string) => {
+      tokens.push({ type, value, line: startLine, column: startCol });
+    };
+
+    //-----------------------------------
+    // whitespace
+    //-----------------------------------
+
+    if (c === " " || c === "\t" || c === "\r") {
+      advance();
       continue;
     }
 
-    if (closingSQ && char !== "'") {
-      if (char == "\\") {
-        escapeMode = true;
-        continue;
-      }
-      lexeme += char;
+    //-----------------------------------
+    // newline
+    //-----------------------------------
+
+    if (c === "\n") {
+      addToken("NEWLINE", "\\n");
+      advance();
       continue;
     }
 
-    if (char === "'" && closingSQ) {
-      if (escapeMode) {
-        lexeme += char;
-        escapeMode = false;
-        continue;
+    //-----------------------------------
+    // strings
+    //-----------------------------------
+
+    if (c === '"' || c === "'") {
+      const quote = c;
+      i++;
+
+      let value = "";
+
+      while (i < source.length) {
+        c = source[i];
+
+        if (c === "\\") {
+          value += source[i + 1];
+          advance(2);
+          continue;
+        }
+
+        if (c === quote) {
+          advance();
+          break;
+        }
+
+        value += c;
+        advance();
       }
-      closingSQ = false;
-      tokens.push(`STRING ${lexeme}`);
-      lexeme = "";
+
+      addToken("STRING", value);
+
       continue;
     }
 
-    if (char === '"' && closingDQ === false && closingSQ === false) {
-      closingDQ = true;
+    //-----------------------------------
+    // numbers
+    //-----------------------------------
+
+    if (isDigit(c)) {
+      let value = "";
+
+      while (i < source.length && (isDigit(source[i]) || source[i] === ".")) {
+        value += source[i];
+        advance();
+      }
+
+      addToken("NUMBER", value);
+
       continue;
     }
 
-    if (closingDQ && char !== '"') {
-      if (char == "\\") {
-        escapeMode = true;
+    //-----------------------------------
+    // identifiers / keywords
+    //-----------------------------------
+
+    if (isAlpha(c) || c === "_") {
+      let value = "";
+
+      while (i < source.length && isAlphaNumeric(source[i])) {
+        value += source[i];
+        advance();
+      }
+
+      const upper = value.toUpperCase();
+
+      if (upper === "TRUE" || upper === "FALSE") {
+        addToken("BOOLEAN", upper);
+
         continue;
       }
-      lexeme += char;
+
+      if (upper === "AND" || upper === "OR" || upper === "NOT") {
+        addToken("LOGICAL", upper);
+
+        continue;
+      }
+
+      // REM comment
+      if (upper === "REM") {
+        while (i < source.length && source[i] !== "\n") advance();
+
+        continue;
+      }
+
+      if (KEYWORDS.has(upper)) {
+        addToken(upper, upper);
+      } else {
+        addToken("ID", value);
+      }
+
       continue;
     }
 
-    if (char === '"' && closingDQ) {
-      if (escapeMode) {
-        lexeme += char;
-        escapeMode = false;
-        continue;
-      }
-      closingDQ = false;
-      tokens.push(`STRING ${lexeme}`);
-      lexeme = "";
+    //-----------------------------------
+    // two-character operators
+    //-----------------------------------
+
+    const two = source.substring(i, i + 2);
+
+    if (two in TWO_CHAR_OPERATORS) {
+      addToken(TWO_CHAR_OPERATORS[two], two);
+
+      advance(2);
       continue;
     }
 
-    if (char.trim()) lexeme += char;
-    if (!char.trim()) {
-      if (!lexeme.trim()) continue;
-      const keywordIndex = KEYWORDS.indexOf(lexeme);
-      if (keywordIndex !== -1) {
-        tokens.push(lexeme);
-        lexeme = "";
-        continue;
-      }
+    //-----------------------------------
+    // one-character operators
+    //-----------------------------------
 
-      if (lexeme === "TRUE" || lexeme === "FALSE") {
-        tokens.push(`BOOLEAN ${lexeme}`);
-        lexeme = "";
-        continue;
-      }
+    if (c in ONE_CHAR_OPERATORS) {
+      addToken(ONE_CHAR_OPERATORS[c], c);
 
-      if (lexeme === "NOT" || lexeme === "AND" || lexeme === "OR") {
-        tokens.push(`LOGICAL ${lexeme}`);
-        lexeme = "";
-        continue;
-      }
-
-      if (isNum(lexeme)) {
-        tokens.push(`NUMBER ${lexeme}`);
-        lexeme = "";
-        continue;
-      }
-
-      if (isValidID(lexeme)) {
-        tokens.push(`SYMBOL ${lexeme}`);
-        lexeme = "";
-        continue;
-      }
-
-      switch (lexeme) {
-        // BITWISE
-        case "~":
-        case "&":
-        case "|":
-        case "^":
-          tokens.push(`BITWISE ${lexeme}`);
-          lexeme = "";
-          continue;
-
-        // Basic Arithmetic
-        case "+":
-          tokens.push("PLUS");
-          lexeme = "";
-          continue;
-        case "-":
-          tokens.push("MINUS");
-          lexeme = "";
-          continue;
-        case "/":
-          tokens.push("DIVIDE");
-          lexeme = "";
-          continue;
-        case "*":
-          tokens.push("MULTIPLY");
-          lexeme = "";
-          continue;
-        case "%":
-          tokens.push("MODULO");
-          lexeme = "";
-          continue;
-
-        // Comparisons
-        case "<":
-          tokens.push("LTHAN");
-          lexeme = "";
-          continue;
-        case ">":
-          tokens.push("GTHAN");
-          lexeme = "";
-          continue;
-        case "<=":
-          tokens.push("LTEQUAL");
-          lexeme = "";
-          continue;
-        case ">=":
-          tokens.push("GTEQUAL");
-          lexeme = "";
-          continue;
-        case "==":
-          tokens.push("EQUALTO");
-          lexeme = "";
-          continue;
-
-        // Declarations
-        case "=":
-          tokens.push("DECLARATION");
-          lexeme = "";
-          continue;
-        case "+=":
-          tokens.push("ADD_DECLARE");
-          lexeme = "";
-          continue;
-        case "-=":
-          tokens.push("SUB_DECLARE");
-          lexeme = "";
-          continue;
-        case "*=":
-          tokens.push("MULT_DECLARE");
-          lexeme = "";
-          continue;
-        case "/=":
-          tokens.push("DIV_DECLARE");
-          lexeme = "";
-          continue;
-        case "%=":
-          tokens.push("MOD_DECLARE");
-          lexeme = "";
-          continue;
-
-        // Punctuations
-        case "[":
-          tokens.push("LBRACKET");
-          lexeme = "";
-          continue;
-        case "]":
-          tokens.push("RBRACKET");
-          lexeme = "";
-          continue;
-        case "(":
-          tokens.push("LPAREN");
-          lexeme = "";
-          continue;
-        case ")":
-          tokens.push("RPAREN");
-          lexeme = "";
-          continue;
-        case ",":
-          tokens.push("COMMA");
-          lexeme = "";
-          continue;
-
-        default:
-          console.log(`SYNTAX ERROR: ${lexeme} is not a valid token`);
-      }
-
-      lexeme = "";
+      advance();
+      continue;
     }
+
+    //-----------------------------------
+    // punctuation
+    //-----------------------------------
+
+    if (c in PUNCTUATION) {
+      addToken(PUNCTUATION[c], c);
+
+      advance();
+      continue;
+    }
+
+    errors.push({
+      message: `Unexpected character '${c}'`,
+      line: currentLine,
+      column: currentColumn,
+    });
+    advance();
   }
 
-  return tokens;
+  return { tokens, errors };
 }

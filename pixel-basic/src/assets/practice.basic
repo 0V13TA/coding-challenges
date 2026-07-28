@@ -20,7 +20,7 @@ SUB nice_function msg THEN
   PRINT "I am fish" + msg
 END SUB
 
-LET accumulator = 0;
+LET accumulator = 0
 
 accumulator += add(scores[0], scores[1]) + 16
 

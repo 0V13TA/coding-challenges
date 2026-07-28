@@ -1,6 +1,8 @@
-import { renderEditor, handleCommand, getSuggestions } from "./editor";
 import "./style.css";
+import ExampleSource from "./assets/practice.basic?raw";
 import { tokenize } from "./tokenizer";
+import { renderEditor, handleCommand, getSuggestions } from "./editor";
+import { pass_1_scope_analysis, type Scope } from "./parser_pass_1";
 
 const canvas = document.getElementById("graphics-canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
@@ -21,16 +23,10 @@ const programMap = new Map<number, string>();
 let currentSuggestions: string[] = [];
 let selectedIndex: number = -1;
 
-const pixelBasic = `LET dan = "FISH"
-CONST number = 20.003
-
-WHILE number < 40 THEN
-  dan = "NOT ' \\"  40"
-  josh += 'tony' AND TRUE
-END WHILE
-`;
-
-console.log(tokenize(pixelBasic));
+let scopes: Scope[] = [];
+const tokens = tokenize(ExampleSource).tokens;
+pass_1_scope_analysis(tokens, scopes);
+console.log(scopes);
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
