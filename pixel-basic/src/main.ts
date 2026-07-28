@@ -3,6 +3,7 @@ import ExampleSource from "./assets/practice.basic?raw";
 import { tokenize } from "./tokenizer";
 import { renderEditor, handleCommand, getSuggestions } from "./editor";
 import { pass_1_scope_analysis, type Scope } from "./parser_pass_1";
+import { parse_program } from "./parser_pass_2";
 
 const canvas = document.getElementById("graphics-canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
@@ -26,7 +27,8 @@ let selectedIndex: number = -1;
 let scopes: Scope[] = [];
 const tokens = tokenize(ExampleSource).tokens;
 pass_1_scope_analysis(tokens, scopes);
-console.log(scopes);
+const ast = parse_program(tokens, scopes);
+console.log(ast);
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;

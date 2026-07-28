@@ -2,7 +2,7 @@ import type { LexError, Token } from "./tokenizer";
 
 export const Errors: LexError[] = [];
 export type SymbolType =
-  "VARIABLE" | "CONSTANT" | "SUB" | "ARRAY" | "DICTIONARY";
+  "VARIABLE" | "CONSTANT" | "SUB" | "NATIVE_SUB" | "ARRAY" | "DICTIONARY";
 
 interface SymbolEntry {
   name: string;
@@ -10,6 +10,7 @@ interface SymbolEntry {
   node_index: number;
   is_hoisted: boolean;
   arity?: number; // Optional property for function arity
+  native_fn?: (...args: any[]) => any; // Optional property for native function reference
 }
 
 export type Scope = {
@@ -20,17 +21,69 @@ export type Scope = {
   symbols: Map<string, SymbolEntry>;
 };
 
+function create_global_scope(): Scope {
+  const global_symbols = new Map<string, SymbolEntry>();
+
+  // --- IO Commands ---
+  global_symbols.set("PRINT", {
+    name: "PRINT",
+    type: "NATIVE_SUB",
+    node_index: -1, // -1 means it doesn't exist in the token array
+    is_hoisted: true,
+    native_fn: (...args: any[]) => console.log(...args),
+  });
+
+  // --- Graphics Commands ---
+  // global_symbols.set("PSET", {
+  //   name: "PSET",
+  //   type: "NATIVE_SUB",
+  //   node_index: -1,
+  //   is_hoisted: true,
+  //   arity: 3, // Requires X, Y, and Color
+  //   native_fn: (x: number, y: number, color: number[]) => {
+  //     ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+  //     ctx.fillRect(x, y, 1, 1);
+  //   },
+  // });
+  //
+  // global_symbols.set("CLEAR_SCREEN", {
+  //   name: "CLEAR_SCREEN",
+  //   type: "NATIVE_SUB",
+  //   node_index: -1,
+  //   is_hoisted: true,
+  //   native_fn: () => {
+  //     ctx.fillStyle = "#111"; // Use your default editor bg color
+  //     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  //   },
+  // });
+
+  // --- Math Commands ---
+  const math_funcs = ["SIN", "COS", "TAN", "ATAN2"];
+  for (const func of math_funcs) {
+    global_symbols.set(func, {
+      name: func,
+      type: "NATIVE_SUB",
+      node_index: -1,
+      is_hoisted: true,
+      // Map the string directly to the Math object method
+      native_fn: Math[func.toLowerCase() as keyof Math] as any,
+    });
+  }
+
+  return {
+    id: 0,
+    parent_id: null,
+    start_token: 0,
+    end_token: 0,
+    symbols: global_symbols,
+  };
+}
+
 export function pass_1_scope_analysis(tokens: Token[], scopes: Scope[]): void {
   const blocksToBeClosed: Token[] = [];
   let active_scope_id = 0;
 
-  scopes.push({
-    id: active_scope_id,
-    parent_id: null,
-    start_token: 0,
-    end_token: 0,
-    symbols: new Map<string, SymbolEntry>(),
-  });
+  scopes.push(create_global_scope());
 
   for (let i = 0; i < tokens.length; i++) {
     let token = tokens[i];
