@@ -1,4 +1,4 @@
-import { KEYWORDS } from "./parser";
+import { KEYWORDS } from "./tokenizer";
 
 export const COMMANDS = {
   RUN: () => console.log("RUN"),
