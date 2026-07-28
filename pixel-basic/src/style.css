@@ -162,3 +162,52 @@ h1 {
 #submit-button:hover {
   background: #f0f0f0;
 }
+
+/* ----------------------------------
+   Error Display
+----------------------------------- */
+#error-display {
+  background-color: #ffcccc;
+  color: #cc0000;
+  border-bottom: 2px solid #000;
+  padding: 10px 15px;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+/* ----------------------------------
+   Autocomplete UI
+----------------------------------- */
+#autocomplete-list {
+  position: absolute;
+  bottom: 100%; /* Anchor right above the input */
+  left: 0;
+  width: 100%;
+  max-height: 150px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--color-bg);
+  border: 2px solid #000;
+  border-bottom: none;
+  box-shadow: 4px -4px 0px rgba(0, 0, 0, 0.2);
+  z-index: 20;
+}
+
+#autocomplete-list li {
+  padding: 8px 16px;
+  cursor: pointer;
+  color: var(--color-text);
+  border-bottom: 1px solid #ddd;
+}
+
+#autocomplete-list li:last-child {
+  border-bottom: none;
+}
+
+#autocomplete-list li.selected,
+#autocomplete-list li:hover {
+  background-color: var(--color-keyword);
+  color: #fff;
+}

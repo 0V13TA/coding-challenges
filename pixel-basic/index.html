@@ -22,16 +22,29 @@
           </div>
 
           <!-- Bottom input bar -->
-          <form id="input-form">
-            <input
-              type="text"
-              id="input"
-              placeholder='10 PRINT "HELLO WORLD"'
-              autocomplete="off"
-              autofocus
-            />
-            <button type="submit" id="submit-button">&rightarrow;</button>
-          </form>
+
+          <div id="editor-container">
+            <!-- New Error Banner -->
+            <div id="error-display" style="display: none"></div>
+
+            <div id="commands-container"></div>
+
+            <!-- Form Container Wrapper -->
+            <div style="position: relative; width: 100%">
+              <!-- New Autocomplete List -->
+              <ul id="autocomplete-list" style="display: none"></ul>
+
+              <form id="input-form">
+                <input
+                  type="text"
+                  id="input"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button id="submit-button" type="submit">ENTER</button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
     </div>

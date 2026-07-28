@@ -1,53 +1,93 @@
 import { KEYWORDS } from "./parser";
 
 export const COMMANDS = {
-  RUN: () => console.log("RUN"), // Starts the execution loop
-  NEW: () => console.log("NEW"), // Wipes the programMap clear
-  LIST: () => console.log("LIST"), // Displays the program lines in the view array
-  STOP: () => console.log("STOP"), // Halts the frame loop
+  RUN: () => console.log("RUN"),
+  NEW: () => console.log("NEW"),
+  LIST: () => console.log("LIST"),
+  STOP: () => console.log("STOP"),
 };
 
-function printToConsole(message: string) {
-  console.log(message); // TODO: Replace with actual console output logic
+// Autocomplete helper
+export function getSuggestions(prefix: string): string[] {
+  if (!prefix) return [];
+  const allCommands = [...Object.keys(COMMANDS), ...KEYWORDS];
+  return allCommands.filter((cmd) =>
+    cmd.toLowerCase().startsWith(prefix.toLowerCase()),
+  );
 }
 
 export function handleCommand(
   command: string,
   programMap: Map<number, string>,
-) {
+): { lineNumber?: number; error?: string } {
   const cmd = command.trim();
+
+  // 1. Direct command match
   if (Object.hasOwn(COMMANDS, cmd)) {
     COMMANDS[cmd as keyof typeof COMMANDS]();
-    return;
+    return {};
   }
 
+  // 2. Numbered line match
   const match = cmd.match(/^(\d+)\s*(.*)$/);
   if (match) {
     const lineNum = parseInt(match[1], 10);
     const code = match[2].trim();
+
     if (code === "") {
       programMap.delete(lineNum);
     } else {
       programMap.set(lineNum, code);
-      return lineNum; // Return the line number for further processing if needed
+      return { lineNumber: lineNum };
     }
-  } else {
-    const allCommands = [...Object.keys(COMMANDS), ...KEYWORDS];
-    let closestMatch: string = "";
-    for (const command of allCommands) {
-      const distance = levenshteinDistance(cmd.toUpperCase(), command);
-      if (distance < 2)
-        closestMatch =
-          distance < levenshteinDistance(cmd.toUpperCase(), closestMatch)
-            ? command
-            : closestMatch;
-    }
-    console.log(allCommands);
-    // If it's neither a command nor a numbered line, log an editor error
-    closestMatch === ""
-      ? printToConsole("SYNTAX ERROR")
-      : printToConsole(`Syntax Error: Did you mean ${closestMatch}`);
+    return {};
   }
+
+  // 3. Error handling with existing Levenshtein logic
+  const allCommands = [...Object.keys(COMMANDS), ...KEYWORDS];
+  let closestMatch: string = "";
+
+  for (const knownCommand of allCommands) {
+    const distance = levenshteinDistance(cmd.toUpperCase(), knownCommand);
+    if (distance < 2) {
+      closestMatch =
+        closestMatch === "" ||
+        distance < levenshteinDistance(cmd.toUpperCase(), closestMatch)
+          ? knownCommand
+          : closestMatch;
+    }
+  }
+
+  const errorMsg =
+    closestMatch === ""
+      ? "SYNTAX ERROR"
+      : `Syntax Error: Did you mean ${closestMatch}?`;
+
+  return { error: errorMsg };
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const matrix = new Array(rows * cols).fill(0);
+
+  for (let i = 0; i < rows; i++) matrix[i] = i;
+  for (let j = 0; j < cols; j++) matrix[j * rows] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] !== b[j - 1]) {
+        matrix[j * rows + i] = Math.min(
+          matrix[(j - 1) * rows + i] + 1,
+          matrix[j * rows + (i - 1)] + 1,
+          matrix[(j - 1) * rows + (i - 1)] + 1,
+        );
+      } else {
+        matrix[j * rows + i] = matrix[(j - 1) * rows + (i - 1)];
+      }
+    }
+  }
+  return matrix[rows * cols - 1];
 }
 
 export function renderEditor(
@@ -55,7 +95,7 @@ export function renderEditor(
   commandsContainer: HTMLElement,
 ) {
   const sortedLines = [...programMap.keys()].sort((a, b) => a - b);
-  commandsContainer.innerHTML = ""; // Clear previous content
+  commandsContainer.innerHTML = "";
 
   for (const lineNum of sortedLines) {
     const lineRow = document.createElement("div");
@@ -73,36 +113,4 @@ export function renderEditor(
     lineRow.appendChild(codeSpan);
     commandsContainer.appendChild(lineRow);
   }
-}
-
-function levenshteinDistance(a: string, b: string): number {
-  const rows = a.length + 1;
-  const cols = b.length + 1;
-  const matrix = new Array(rows * cols).fill(0);
-
-  // Initialize the first row
-  for (let i = 0; i < rows; i++) {
-    matrix[i] = i;
-  }
-
-  // Initialize the first column
-  for (let j = 0; j < cols; j++) {
-    matrix[j * rows] = j;
-  }
-
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      if (a[i - 1] !== b[j - 1]) {
-        matrix[j * rows + i] = Math.min(
-          matrix[(j - 1) * rows + i] + 1, // Insertion
-          matrix[j * rows + (i - 1)] + 1, // Deletion
-          matrix[(j - 1) * rows + (i - 1)] + 1, // Substitution
-        );
-      } else {
-        matrix[j * rows + i] = matrix[(j - 1) * rows + (i - 1)];
-      }
-    }
-  }
-
-  return matrix[rows * cols - 1];
 }
