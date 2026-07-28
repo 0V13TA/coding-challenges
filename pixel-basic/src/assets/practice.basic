@@ -1,0 +1,61 @@
+REM THIS IS AN EXAMPLE OF HOW THE PROJECT SHOULD BE.
+
+SCREEN 20, 10
+
+LET dan = "HELLO"
+CONST names = ["BOM", "RUM", "SUM"]
+CONST scores = [10, 20, 30, 40 + 50, 70]
+CONST dictionary = [
+  fly = "To move above groud",
+  walk = "To move with feet",
+]
+
+REM This is a comment/Remark
+
+SUB add_2_numbers a, b THEN
+  RETURN a + b
+END SUB
+
+SUB nice_function msg THEN
+  PRINT "I am fish" + msg
+END SUB
+
+LET accumulator = 0;
+
+accumulator += add(scores[0], scores[1]) + 16
+
+nice_function " and I like donkeys"
+
+WHILE accumulator < 20 AND LENGTH(scores) >= 5 THEN
+  nice_function "I am printing" + accumulator
+END WHILE
+
+LET i = 0
+WHILE TRUE THEN
+  IF i < LENGTH(names) THEN BREAK
+  IF names[i] == "RUM" THEN CONTINUE
+  PRINT names[i]
+
+  SWITCH names[i] THEN
+    CASE "BOM" THEN
+      PRINT "My name is " + names[i]
+    END CASE
+    DEFAULT THEN
+      PRINT "I have othe names"
+    END DEFAULT
+  END SWITCH
+
+  IF i < 5 THEN
+    PRINT "I am hot"
+  ELSE IF i > 5 THEN
+    PRINT "I am cold"
+  ELSE PRINT "I am something"
+  END IF
+END WHILE
+
+CONST user = INPUT("What is your name> ")
+PRINT "Hello " + user
+
+PSET 10 20 [200, 30, 40]
+
+CONST bool = 10 | 20
