@@ -1,5 +1,56 @@
+export type TokenType =
+  | "LET"
+  | "CONST"
+  | "IF"
+  | "THEN"
+  | "ELSE"
+  | "WHILE"
+  | "DO"
+  | "END"
+  | "SUB"
+  | "RETURN"
+  | "BREAK"
+  | "CONTINUE"
+  | "SWITCH"
+  | "CASE"
+  | "DEFAULT"
+  | "EQUALTO"
+  | "NOTEQUALTO"
+  | "LTEQUAL"
+  | "GTEQUAL"
+  | "ADD_DECLARE"
+  | "SUB_DECLARE"
+  | "MULT_DECLARE"
+  | "DIV_DECLARE"
+  | "MOD_DECLARE"
+  | "DECLARATION"
+  | "PLUS"
+  | "MINUS"
+  | "MULTIPLY"
+  | "DIVIDE"
+  | "MODULO"
+  | "LTHAN"
+  | "GTHAN"
+  | "BITWISE"
+  | "LPAREN"
+  | "RPAREN"
+  | "LBRACKET"
+  | "RBRACKET"
+  | "LBRACE"
+  | "RBRACE"
+  | "COMMA"
+  | "COLON"
+  | "NUMBER"
+  | "STRING"
+  | "BOOLEAN"
+  | "ID"
+  | "NEWLINE"
+  | "AND"
+  | "OR"
+  | "NOT";
+
 export type Token = {
-  type: string;
+  type: TokenType;
   value: string;
   line: number;
   column: number;
@@ -24,7 +75,6 @@ export const KEYWORDS = new Set([
   "RETURN",
   "BREAK",
   "CONTINUE",
-  "SCREEN",
   "SWITCH",
   "CASE",
   "DEFAULT",
@@ -109,7 +159,7 @@ export function tokenize(source: string): {
     const startLine = currentLine;
     const startCol = currentColumn;
 
-    const addToken = (type: string, value: string) => {
+    const addToken = (type: TokenType, value: string) => {
       tokens.push({ type, value, line: startLine, column: startCol });
     };
 
@@ -203,8 +253,7 @@ export function tokenize(source: string): {
       }
 
       if (upper === "AND" || upper === "OR" || upper === "NOT") {
-        addToken("LOGICAL", upper);
-
+        addToken(upper as TokenType, upper);
         continue;
       }
 
@@ -216,7 +265,7 @@ export function tokenize(source: string): {
       }
 
       if (KEYWORDS.has(upper)) {
-        addToken(upper, upper);
+        addToken(upper as TokenType, upper);
       } else {
         addToken("ID", value);
       }
@@ -231,7 +280,7 @@ export function tokenize(source: string): {
     const two = source.substring(i, i + 2);
 
     if (two in TWO_CHAR_OPERATORS) {
-      addToken(TWO_CHAR_OPERATORS[two], two);
+      addToken(TWO_CHAR_OPERATORS[two] as TokenType, two);
 
       advance(2);
       continue;
@@ -242,7 +291,7 @@ export function tokenize(source: string): {
     //-----------------------------------
 
     if (c in ONE_CHAR_OPERATORS) {
-      addToken(ONE_CHAR_OPERATORS[c], c);
+      addToken(ONE_CHAR_OPERATORS[c] as TokenType, c);
 
       advance();
       continue;
@@ -253,7 +302,7 @@ export function tokenize(source: string): {
     //-----------------------------------
 
     if (c in PUNCTUATION) {
-      addToken(PUNCTUATION[c], c);
+      addToken(PUNCTUATION[c] as TokenType, c);
 
       advance();
       continue;

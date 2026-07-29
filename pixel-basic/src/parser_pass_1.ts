@@ -33,6 +33,17 @@ function create_global_scope(): Scope {
     native_fn: (...args: any[]) => console.log(...args),
   });
 
+  global_symbols.set("SCREEN", {
+    name: "SCREEN",
+    type: "NATIVE_SUB",
+    node_index: -1,
+    is_hoisted: true,
+    // Add whatever native JS canvas logic you need here
+    native_fn: (width: number, height: number) => {
+      console.log(`Setting screen size to ${width}x${height}`);
+    },
+  });
+
   // --- Graphics Commands ---
   // global_symbols.set("PSET", {
   //   name: "PSET",
