@@ -2,11 +2,16 @@ import "./style.css";
 import ExampleSource from "./assets/practice.basic?raw";
 import { tokenize } from "./tokenizer";
 import { renderEditor, handleCommand, getSuggestions } from "./editor";
-import { pass_1_scope_analysis, type Scope } from "./parser_pass_1";
+import {
+  create_global_scope,
+  Errors,
+  pass_1_scope_analysis,
+  type Scope,
+} from "./parser_pass_1";
 import { parse_program } from "./parser_pass_2";
 
 const canvas = document.getElementById("graphics-canvas") as HTMLCanvasElement;
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d")!;
 const inputForm = document.getElementById("input-form") as HTMLFormElement;
 const inputElement = document.getElementById("input") as HTMLInputElement;
 const commandsContainer = document.getElementById(
@@ -19,17 +24,68 @@ const autocompleteList = document.getElementById(
   "autocomplete-list",
 ) as HTMLUListElement;
 
+// At the top of main.ts
+const keys_down = new Set<string>();
+
+window.addEventListener("keydown", (e) => keys_down.add(e.key));
+window.addEventListener("keyup", (e) => keys_down.delete(e.key));
+
 const programMap = new Map<number, string>();
 
 let currentSuggestions: string[] = [];
 let selectedIndex: number = -1;
 
 let scopes: Scope[] = [];
+scopes.push(create_global_scope(ctx, keys_down));
 const tokens = tokenize(ExampleSource).tokens;
 pass_1_scope_analysis(tokens, scopes);
 const ast = parse_program(tokens, scopes);
-console.log(ast);
+console.log(Errors);
+import { create_environment } from "./runtime";
+import { evaluate_program, hoist_program } from "./evaluator";
 
+const global_env = create_environment(null);
+hoist_program(ast, global_env);
+const interpreter = evaluate_program(ast, global_env);
+
+const TARGET_FPS = 60;
+const STEP_MS = 1000 / TARGET_FPS;
+let last_time = performance.now();
+let accumulator = 0;
+
+function engine_tick(current_time: number) {
+  let delta_time = current_time - last_time;
+  last_time = current_time;
+
+  // Cap delta to avoid death spirals on tab switch
+  if (delta_time > 250) delta_time = 250;
+  accumulator += delta_time;
+
+  let is_running = true;
+
+  // Process logical frames
+  while (accumulator >= STEP_MS) {
+    const result = interpreter.next();
+    accumulator -= STEP_MS;
+
+    if (result.done || (result.value && result.value.status !== "running")) {
+      is_running = false;
+      if (result.value?.status === "error") {
+        errorDisplay.textContent = result.value.message;
+        errorDisplay.style.display = "block";
+      }
+      break;
+    }
+  }
+
+  if (is_running) {
+    requestAnimationFrame(engine_tick);
+  } else {
+    console.log("Program Execution Terminated.");
+  }
+}
+
+// Kick off the engine
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -40,6 +96,7 @@ function resizeCanvas() {
 }
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
+requestAnimationFrame(engine_tick);
 
 function hideAutocomplete() {
   autocompleteList.style.display = "none";

@@ -21,7 +21,10 @@ export type Scope = {
   symbols: Map<string, SymbolEntry>;
 };
 
-function create_global_scope(): Scope {
+export function create_global_scope(
+  ctx: CanvasRenderingContext2D,
+  keys_down: Set<string>,
+): Scope {
   const global_symbols = new Map<string, SymbolEntry>();
 
   // --- IO Commands ---
@@ -45,28 +48,60 @@ function create_global_scope(): Scope {
   });
 
   // --- Graphics Commands ---
-  // global_symbols.set("PSET", {
-  //   name: "PSET",
-  //   type: "NATIVE_SUB",
-  //   node_index: -1,
-  //   is_hoisted: true,
-  //   arity: 3, // Requires X, Y, and Color
-  //   native_fn: (x: number, y: number, color: number[]) => {
-  //     ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-  //     ctx.fillRect(x, y, 1, 1);
-  //   },
-  // });
-  //
-  // global_symbols.set("CLEAR_SCREEN", {
-  //   name: "CLEAR_SCREEN",
-  //   type: "NATIVE_SUB",
-  //   node_index: -1,
-  //   is_hoisted: true,
-  //   native_fn: () => {
-  //     ctx.fillStyle = "#111"; // Use your default editor bg color
-  //     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  //   },
-  // });
+  global_symbols.set("FILL_COLOR", {
+    name: "fill_color",
+    type: "NATIVE_SUB",
+    node_index: -1,
+    is_hoisted: true,
+    arity: 3, // R, G, B
+    native_fn: (r: number, g: number, b: number) => {
+      if (ctx) ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    },
+  });
+
+  global_symbols.set("DRAW_RECT", {
+    name: "draw_rect",
+    type: "NATIVE_SUB",
+    node_index: -1,
+    is_hoisted: true,
+    arity: 4, // X, Y, W, H
+    native_fn: (x: number, y: number, w: number, h: number) => {
+      if (ctx) ctx.fillRect(x, y, w, h);
+    },
+  });
+
+  global_symbols.set("PSET", {
+    name: "PSET",
+    type: "NATIVE_SUB",
+    node_index: -1,
+    is_hoisted: true,
+    arity: 3, // Requires X, Y, and Color
+    native_fn: (x: number, y: number, color: number[]) => {
+      ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+      ctx.fillRect(x, y, 1, 1);
+    },
+  });
+
+  global_symbols.set("CLEAR_SCREEN", {
+    name: "CLEAR_SCREEN",
+    type: "NATIVE_SUB",
+    node_index: -1,
+    is_hoisted: true,
+    native_fn: () => {
+      ctx.fillStyle = "#111"; // Use your default editor bg color
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    },
+  });
+
+  // Then register the native function in your global scope:
+  global_symbols.set("is_key_down", {
+    name: "is_key_down",
+    type: "NATIVE_SUB",
+    node_index: -1,
+    is_hoisted: true,
+    arity: 1,
+    native_fn: (key: string) => keys_down.has(key),
+  });
 
   // --- Math Commands ---
   const math_funcs = ["SIN", "COS", "TAN", "ATAN2"];
@@ -93,8 +128,6 @@ function create_global_scope(): Scope {
 export function pass_1_scope_analysis(tokens: Token[], scopes: Scope[]): void {
   const blocksToBeClosed: Token[] = [];
   let active_scope_id = 0;
-
-  scopes.push(create_global_scope());
 
   for (let i = 0; i < tokens.length; i++) {
     let token = tokens[i];

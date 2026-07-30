@@ -108,7 +108,8 @@ export type ASTNode =
   | BreakStatement
   | ContinueStatement
   | ReturnStatement
-  | SubDeclaration;
+  | SubDeclaration
+  | Program;
 
 export type Program = {
   type: "Program";
