@@ -449,6 +449,19 @@ function parse_if(state: ParserState): IfStatement | null {
   const body: ASTNode[] = [];
   let alternate: ASTNode[] | IfStatement | undefined = undefined;
 
+  if (peek(state).type !== "NEWLINE") {
+    const stmt = parse_statement(state);
+    if (stmt) body.push(stmt);
+
+    // Return early without expecting an END IF
+    return {
+      type: "IfStatement",
+      condition,
+      body,
+      alternate,
+    };
+  }
+
   // Consume the main body
   while (
     state.currentIndex < state.tokens.length &&
@@ -566,8 +579,10 @@ function parse_assignment_or_call(
   if (
     next_token.type === "DECLARATION" ||
     next_token.type === "ADD_DECLARE" ||
-    next_token.type === "SUB_DECLARE"
-    // Add other assignment operators here...
+    next_token.type === "SUB_DECLARE" ||
+    next_token.type === "DIV_DECLARE" ||
+    next_token.type === "MULT_DECLARE" ||
+    next_token.type === "MOD_DECLARE"
   ) {
     const operator = advance(state); // Consume the assignment operator
     const value = parse_expression(state, 0);

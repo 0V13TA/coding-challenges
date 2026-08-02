@@ -1,10 +1,11 @@
+import type { Callable } from "./runtime";
 import type { LexError, Token } from "./tokenizer";
 
 export const Errors: LexError[] = [];
 export type SymbolType =
   "VARIABLE" | "CONSTANT" | "SUB" | "NATIVE_SUB" | "ARRAY" | "DICTIONARY";
 
-interface SymbolEntry {
+export interface SymbolEntry {
   name: string;
   type: SymbolType;
   node_index: number;
@@ -24,23 +25,19 @@ export type Scope = {
 export function create_global_scope(
   ctx: CanvasRenderingContext2D,
   keys_down: Set<string>,
-): Scope {
-  const global_symbols = new Map<string, SymbolEntry>();
+) {
+  const global_symbols = new Map<string, Callable>();
 
   // --- IO Commands ---
   global_symbols.set("PRINT", {
-    name: "PRINT",
-    type: "NATIVE_SUB",
-    node_index: -1, // -1 means it doesn't exist in the token array
-    is_hoisted: true,
+    arity: 1,
+    is_native: true,
     native_fn: (...args: any[]) => console.log(...args),
   });
 
   global_symbols.set("SCREEN", {
-    name: "SCREEN",
-    type: "NATIVE_SUB",
-    node_index: -1,
-    is_hoisted: true,
+    is_native: true,
+    arity: 2,
     // Add whatever native JS canvas logic you need here
     native_fn: (width: number, height: number) => {
       console.log(`Setting screen size to ${width}x${height}`);
@@ -49,10 +46,7 @@ export function create_global_scope(
 
   // --- Graphics Commands ---
   global_symbols.set("FILL_COLOR", {
-    name: "fill_color",
-    type: "NATIVE_SUB",
-    node_index: -1,
-    is_hoisted: true,
+    is_native: true,
     arity: 3, // R, G, B
     native_fn: (r: number, g: number, b: number) => {
       if (ctx) ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
@@ -60,10 +54,7 @@ export function create_global_scope(
   });
 
   global_symbols.set("DRAW_RECT", {
-    name: "draw_rect",
-    type: "NATIVE_SUB",
-    node_index: -1,
-    is_hoisted: true,
+    is_native: true,
     arity: 4, // X, Y, W, H
     native_fn: (x: number, y: number, w: number, h: number) => {
       if (ctx) ctx.fillRect(x, y, w, h);
@@ -71,10 +62,7 @@ export function create_global_scope(
   });
 
   global_symbols.set("PSET", {
-    name: "PSET",
-    type: "NATIVE_SUB",
-    node_index: -1,
-    is_hoisted: true,
+    is_native: true,
     arity: 3, // Requires X, Y, and Color
     native_fn: (x: number, y: number, color: number[]) => {
       ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
@@ -83,10 +71,8 @@ export function create_global_scope(
   });
 
   global_symbols.set("CLEAR_SCREEN", {
-    name: "CLEAR_SCREEN",
-    type: "NATIVE_SUB",
-    node_index: -1,
-    is_hoisted: true,
+    arity: 0,
+    is_native: true,
     native_fn: () => {
       ctx.fillStyle = "#111"; // Use your default editor bg color
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -95,10 +81,7 @@ export function create_global_scope(
 
   // Then register the native function in your global scope:
   global_symbols.set("is_key_down", {
-    name: "is_key_down",
-    type: "NATIVE_SUB",
-    node_index: -1,
-    is_hoisted: true,
+    is_native: true,
     arity: 1,
     native_fn: (key: string) => keys_down.has(key),
   });
@@ -107,22 +90,14 @@ export function create_global_scope(
   const math_funcs = ["SIN", "COS", "TAN", "ATAN2"];
   for (const func of math_funcs) {
     global_symbols.set(func, {
-      name: func,
-      type: "NATIVE_SUB",
-      node_index: -1,
-      is_hoisted: true,
+      arity: -1,
+      is_native: true,
       // Map the string directly to the Math object method
       native_fn: Math[func.toLowerCase() as keyof Math] as any,
     });
   }
 
-  return {
-    id: 0,
-    parent_id: null,
-    start_token: 0,
-    end_token: 0,
-    symbols: global_symbols,
-  };
+  return global_symbols;
 }
 
 export function pass_1_scope_analysis(tokens: Token[], scopes: Scope[]): void {
@@ -137,8 +112,31 @@ export function pass_1_scope_analysis(tokens: Token[], scopes: Scope[]): void {
       token.type === "IF" ||
       token.type === "DO" ||
       token.type === "SUB" ||
-      token.type === "WHILE"
+      token.type === "WHILE" ||
+      token.type === "SWITCH" ||
+      token.type === "CASE" ||
+      token.type === "DEFAULT"
     ) {
+      if (token.type === "IF" && i > 0 && tokens[i - 1].type === "ELSE") {
+        continue;
+      }
+
+      if (token.type === "IF") {
+        let lookahead = i + 1;
+        // Find the corresponding THEN token
+        while (lookahead < tokens.length && tokens[lookahead].type !== "THEN") {
+          lookahead++;
+        }
+        // If the token after THEN is NOT a newline, it's a single-line IF.
+        // We skip pushing a scope block because there is no END IF.
+        if (
+          lookahead + 1 < tokens.length &&
+          tokens[lookahead + 1].type !== "NEWLINE"
+        ) {
+          continue;
+        }
+      }
+
       const new_scope: Scope = {
         id: scopes.length,
         parent_id: active_scope_id,

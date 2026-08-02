@@ -1,61 +1,72 @@
-REM THIS IS AN EXAMPLE OF HOW THE PROJECT SHOULD BE.
+REM ==========================================
+REM PIXEL-BASIC: SYSTEMS SIMULATION STRESS TEST
+REM ==========================================
 
-SCREEN 20, 10
+SCREEN 800, 600
+CLEAR_SCREEN
 
-LET dan = "HELLO"
-CONST names = ["BOM", "RUM", "SUM"]
-CONST scores = [10, 20, 30, 40 + 50, 70]
-CONST dictionary = [
-  fly = "To move above groud",
-  walk = "To move with feet",
+REM 1. Dictionaries & Arrays (Engine State)
+LET engine_state = [
+  running = TRUE,
+  tick = 0,
+  max_ticks = 200,
+  render_mode = 2
 ]
 
-REM This is a comment/Remark
+REM A flat array representing a 2D matrix grid
+LET flat_matrix = [10, 20, 30, 40]
 
-SUB add_2_numbers a, b THEN
-  RETURN a + b
+REM 2. Subroutines & Logic (Euclidean Distance approximation)
+SUB get_distance x1, y1, x2, y2 THEN
+  LET dx = x2 - x1
+  LET dy = y2 - y1
+  RETURN (dx * dx) + (dy * dy)
 END SUB
 
-SUB nice_function msg THEN
-  PRINT "I am fish" + msg
+REM 3. Array Mutation & Loops (Matrix processing)
+SUB process_matrix grid, size THEN
+  LET i = 0
+  WHILE i < size THEN
+    grid[i] *= 2
+    i += 1
+  END WHILE
+  RETURN grid
 END SUB
 
-LET accumulator = 0
+PRINT "Initializing stylized simulation..."
+PRINT "Processed Matrix Output:"
+PRINT process_matrix(flat_matrix, 4)
 
-accumulator += add(scores[0], scores[1]) + 16
+LET particle_x = 0
+LET particle_y = 300
 
-nice_function " and I like donkeys"
-
-WHILE accumulator < 20 AND LENGTH(scores) >= 5 THEN
-  nice_function "I am printing" + accumulator
-END WHILE
-
-LET i = 0
-WHILE TRUE THEN
-  IF i < LENGTH(names) THEN BREAK
-  IF names[i] == "RUM" THEN CONTINUE
-  PRINT names[i]
-
-  SWITCH names[i] THEN
-    CASE "BOM" THEN
-      PRINT "My name is " + names[i]
-    END CASE
-    DEFAULT THEN
-      PRINT "I have othe names"
-    END DEFAULT
+REM 4. Main Graphics Loop (Switch, Math, Break, Continue)
+WHILE engine_state["running"] == TRUE THEN
+  
+  SWITCH engine_state["render_mode"] THEN
+    CASE 1 THEN FILL_COLOR 255, 0, 0 END CASE
+    CASE 2 THEN FILL_COLOR 0, 255, 255 END CASE
+    DEFAULT THEN FILL_COLOR 255, 255, 255 END DEFAULT
   END SWITCH
 
-  IF i < 5 THEN
-    PRINT "I am hot"
-  ELSE IF i > 5 THEN
-    PRINT "I am cold"
-  ELSE PRINT "I am something"
+  IF particle_x % 50 == 0 THEN
+    REM Test CONTINUE by skipping rendering on specific grid lines
+    particle_x += 1
+    CONTINUE
   END IF
+
+  REM Calculate dynamic Y using the SIN function 
+  particle_y = 300 + SIN(particle_x * 0.1 + engine_state["tick"] * 0.05) * 50
+
+  DRAW_RECT particle_x, particle_y, 4, 4
+  particle_x += 2
+
+  engine_state["tick"] += 1
+  
+  IF engine_state["tick"] >= engine_state["max_ticks"] THEN
+    PRINT "Simulation Complete. Terminating loop."
+    engine_state["running"] = FALSE
+    BREAK
+  END IF
+
 END WHILE
-
-CONST user = INPUT("What is your name> ")
-PRINT "Hello " + user
-
-PSET 10 20 [200, 30, 40]
-
-CONST bool = 10 | 20

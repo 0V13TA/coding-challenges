@@ -299,7 +299,10 @@ export function* evaluate_program(
       for (const arg of node.args)
         evaluated_args.push(yield* evaluate_program(arg, env));
 
-      if (evaluated_args.length !== func_entry.arity) {
+      if (
+        func_entry.arity !== -1 &&
+        evaluated_args.length !== func_entry.arity
+      ) {
         yield {
           status: "error",
           message: `Function ${node.caller} expects ${func_entry.arity} arguments, but got ${evaluated_args.length}.`,
@@ -331,6 +334,60 @@ export function* evaluate_program(
       return null;
     }
 
+    // --- Subroutines ---
+    case "SubDeclaration": {
+      // Subroutines are hoisted before execution begins, so we safely skip them here.
+      return null;
+    }
+
+    // --- Switch Statements ---
+    case "SwitchStatement": {
+      const discriminant_value = yield* evaluate_program(
+        node.discriminant,
+        env,
+      );
+      let matched = false;
+
+      for (const case_node of node.cases) {
+        const case_value = yield* evaluate_program(case_node.value, env);
+        if (discriminant_value === case_value) {
+          matched = true;
+          for (const stmt of case_node.body) {
+            const result = yield* evaluate_program(stmt, env);
+            if (is_control_flow(result)) return result;
+          }
+          break; // Exit switch after a matched case
+        }
+      }
+
+      if (!matched && node.default_case) {
+        for (const stmt of node.default_case) {
+          const result = yield* evaluate_program(stmt, env);
+          if (is_control_flow(result)) return result;
+        }
+      }
+      return null;
+    }
+
+    // --- Unary Expressions ---
+    case "UnaryExpression": {
+      const arg_value = yield* evaluate_program(node.argument, env);
+      switch (node.operator) {
+        case "-":
+          return -arg_value;
+        case "NOT":
+          return !arg_value;
+        case "~":
+          return ~arg_value;
+        default:
+          yield {
+            status: "error",
+            message: `Unknown unary operator: '${node.operator}'`,
+          };
+      }
+      return null;
+    }
+
     case "Program": {
       let last_evaluated = null;
       for (const statement of node.body) {
@@ -342,7 +399,7 @@ export function* evaluate_program(
     default:
       yield {
         status: "error",
-        message: `Unimplemented AST Node: ${node.type}`,
+        message: `Unimplemented AST Node: ${node}`,
       };
       return null;
   }

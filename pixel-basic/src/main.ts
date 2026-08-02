@@ -7,6 +7,7 @@ import {
   Errors,
   pass_1_scope_analysis,
   type Scope,
+  type SymbolEntry,
 } from "./parser_pass_1";
 import { parse_program } from "./parser_pass_2";
 
@@ -35,16 +36,26 @@ const programMap = new Map<number, string>();
 let currentSuggestions: string[] = [];
 let selectedIndex: number = -1;
 
-let scopes: Scope[] = [];
-scopes.push(create_global_scope(ctx, keys_down));
+let scopes: Scope[] = [
+  {
+    id: 0,
+    parent_id: null, // Points to the outer scope
+    start_token: 0, // The index of the 'THEN' token
+    end_token: 0, // The index of the 'END' token
+    symbols: new Map<string, SymbolEntry>(),
+  },
+];
 const tokens = tokenize(ExampleSource).tokens;
 pass_1_scope_analysis(tokens, scopes);
 const ast = parse_program(tokens, scopes);
-console.log(Errors);
+console.log("Errors:", Errors);
 import { create_environment } from "./runtime";
 import { evaluate_program, hoist_program } from "./evaluator";
 
-const global_env = create_environment(null);
+const global_env = create_environment(
+  null,
+  create_global_scope(ctx, keys_down),
+);
 hoist_program(ast, global_env);
 const interpreter = evaluate_program(ast, global_env);
 
