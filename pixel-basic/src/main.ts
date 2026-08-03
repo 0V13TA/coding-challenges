@@ -19,6 +19,35 @@ const commandsContainer = document.getElementById(
   "commands-container",
 ) as HTMLElement;
 
+const uiOverlay = document.getElementById("ui-overlay") as HTMLElement;
+
+// Create and inject the drawer toggle button
+if (uiOverlay) {
+  const drawerToggle = document.createElement("button");
+  drawerToggle.id = "drawer-toggle";
+  drawerToggle.title = "Toggle Editor";
+
+  // Default icon (pointing left to indicate it will close)
+  drawerToggle.innerHTML = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 18l-6-6 6-6"/>
+    </svg>
+  `;
+
+  uiOverlay.appendChild(drawerToggle);
+
+  // Toggle logic
+  drawerToggle.addEventListener("click", () => {
+    uiOverlay.classList.toggle("drawer-closed");
+
+    const isClosed = uiOverlay.classList.contains("drawer-closed");
+    // Flip the chevron icon depending on the drawer state
+    drawerToggle.innerHTML = isClosed
+      ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`
+      : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`;
+  });
+}
+
 // New UI Elements
 const errorDisplay = document.getElementById("error-display") as HTMLElement;
 const autocompleteList = document.getElementById(
@@ -83,7 +112,7 @@ function engine_tick(current_time: number) {
       is_running = false;
       if (result.value?.status === "error") {
         errorDisplay.textContent = result.value.message;
-        errorDisplay.style.display = "block";
+        errorDisplay.style.display = "flex";
       }
       break;
     }
@@ -122,7 +151,7 @@ function renderAutocomplete() {
   }
 
   autocompleteList.innerHTML = "";
-  autocompleteList.style.display = "block";
+  autocompleteList.style.display = "flex";
 
   currentSuggestions.forEach((suggestion, index) => {
     const li = document.createElement("li");
@@ -199,7 +228,7 @@ if (inputForm && inputElement && commandsContainer) {
     // Toggle Error UI
     if (result.error) {
       errorDisplay.textContent = result.error;
-      errorDisplay.style.display = "block";
+      errorDisplay.style.display = "flex";
     } else {
       errorDisplay.style.display = "none";
       inputElement.value = `${result.lineNumber !== undefined ? result.lineNumber + 10 : ""} `;

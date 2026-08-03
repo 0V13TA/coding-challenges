@@ -1,39 +1,26 @@
 :root {
-  /* Default PIXEL BASIC Palette */
-  --color-keyword: #0000ff; /* Classic Blue */
-  --color-function: #800080; /* Deep Purple */
-  --color-variable: #008080; /* Teal */
-  --color-comment: #008000; /* DOS Green */
-  --color-operator: #d10000; /* Crimson */
-  --color-literal: #a52a2a; /* Burnt Orange */
-  --color-text: #000000; /* Default Black */
-  --color-bg: rgba(255, 255, 255, 0.92); /* Editor Background */
-}
+  /* Minimalist Muted Dark Palette */
+  --bg-base: #11111b;
+  --bg-panel: rgba(30, 30, 46, 0.75);
+  --bg-input: rgba(24, 24, 37, 0.9);
 
-.token-keyword {
-  color: var(--color-keyword);
-  font-weight: bold;
-}
-.token-function {
-  color: var(--color-function);
-  font-weight: bold;
-}
-.token-variable {
-  color: var(--color-variable);
-}
-.token-comment {
-  color: var(--color-comment);
-  font-style: italic;
-}
-.token-operator {
-  color: var(--color-operator);
-}
-.token-literal {
-  color: var(--color-literal);
-}
+  --text-main: #cdd6f4;
+  --text-muted: #6c7086;
+  --text-accent: #cba6f7;
 
-.command {
-  color: var(--color-text);
+  /* Syntax Highlighting */
+  --color-keyword: #cba6f7; /* Purple */
+  --color-function: #89b4fa; /* Blue */
+  --color-variable: #f9e2af; /* Yellow */
+  --color-comment: #a6adc8; /* Muted Grey/Blue */
+  --color-operator: #89dceb; /* Sky */
+  --color-literal: #f38ba8; /* Red */
+
+  --ui-border: 1px solid rgba(255, 255, 255, 0.1);
+  --ui-radius: 12px;
+  --ui-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --font-mono: "JetBrains Mono", "Fira Code", "Courier New", monospace;
 }
 
 html,
@@ -43,9 +30,38 @@ body {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  font-family: monospace;
+  font-family: var(--font-mono);
   box-sizing: border-box;
-  background-color: #1a1a1a;
+  background-color: var(--bg-base);
+  color: var(--text-main);
+}
+
+/* ----------------------------------
+   Syntax Tokens
+----------------------------------- */
+.token-keyword {
+  color: var(--color-keyword);
+  font-weight: 600;
+}
+.token-function {
+  color: var(--color-function);
+}
+.token-variable {
+  color: var(--color-variable);
+}
+.token-comment {
+  color: var(--color-comment);
+  font-style: italic;
+  opacity: 0.8;
+}
+.token-operator {
+  color: var(--color-operator);
+}
+.token-literal {
+  color: var(--color-literal);
+}
+.command {
+  color: var(--text-main);
 }
 
 /* ----------------------------------
@@ -58,7 +74,7 @@ body {
   width: 100%;
   height: 100%;
   z-index: 1;
-  background-color: var(--color-bg);
+  background-color: var(--bg-base);
 }
 
 /* ----------------------------------
@@ -68,111 +84,140 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 50vw; /* Exact half screen */
+  width: 40vw; /* Slimmer, more focused width */
+  min-width: 400px;
   height: 100vh;
-  z-index: 10; /* Sits on top of the canvas */
+  z-index: 10;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 24px;
   box-sizing: border-box;
-  pointer-events: none; /* Let clicks pass through empty space to the canvas */
+  pointer-events: none;
 }
 
 h1 {
-  margin: 0 0 15px 0;
-  font-size: 2.5rem;
-  color: #f11; /* Changed to white for contrast against dark canvas */
-  text-shadow: 2px 2px 0 #000; /* Retro shadow */
-  pointer-events: auto; /* Re-enable clicks */
+  margin: 0 0 20px 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  pointer-events: auto;
 }
 
-/* Layout Container */
+/* ----------------------------------
+   Editor Layout
+----------------------------------- */
 #editor-container {
   flex: 1;
-  border: 2px solid #000;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-bg); /* Slight transparency */
-  box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.5); /* Retro block shadow for depth */
-  pointer-events: auto; /* Re-enable clicks for the editor */
-  backdrop-filter: blur(
-    2px
-  ); /* Extra finesse: blurs the canvas slightly under the editor */
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+  pointer-events: auto;
+  overflow: hidden;
 }
 
-/* Display Area */
 #commands-container {
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  padding: 16px 0;
+}
+
+/* Hide scrollbar for a cleaner look */
+#commands-container::-webkit-scrollbar {
+  width: 6px;
+}
+#commands-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
 }
 
 /* Individual Line Grid */
 .command-line {
   display: grid;
-  grid-template-columns: 60px 1fr;
-  border-bottom: 1px solid #ddd;
-  min-height: 36px;
+  grid-template-columns: 50px 1fr;
+  min-height: 28px;
   align-items: center;
+  transition: background 0.2s ease;
+}
+
+.command-line:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .line-number {
-  border-right: 2px solid #000;
-  text-align: center;
-  font-weight: bold;
-  background-color: rgba(240, 240, 240, 0.9);
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--text-muted);
+  text-align: right;
+  padding-right: 16px;
+  font-size: 0.85rem;
+  user-select: none;
 }
 
 .command {
-  padding-left: 15px;
-  font-size: 1.1rem;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
-/* Input Form */
+/* ----------------------------------
+   Input Form
+----------------------------------- */
 #input-form {
   display: flex;
-  border-top: 2px solid #000;
-  background: #fff;
+  background: var(--bg-input);
+  border-top: var(--ui-border);
+  padding: 8px;
 }
 
 #input {
   flex: 1;
   border: none;
-  padding: 12px 16px;
+  background: transparent;
+  color: var(--text-main);
+  padding: 12px;
   font-family: inherit;
-  font-size: 1.1rem;
+  font-size: 1rem;
   outline: none;
 }
 
 #submit-button {
   border: none;
-  border-left: 2px solid #000;
-  background: transparent;
-  padding: 0 24px;
-  font-size: 1.2rem;
+  background: var(--text-accent);
+  color: var(--bg-base);
+  border-radius: 6px;
+  padding: 0 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    opacity 0.2s ease,
+    transform 0.1s ease;
 }
 
 #submit-button:hover {
-  background: #f0f0f0;
+  opacity: 0.9;
+}
+
+#submit-button:active {
+  transform: scale(0.96);
 }
 
 /* ----------------------------------
    Error Display
 ----------------------------------- */
 #error-display {
-  background-color: #ffcccc;
-  color: #cc0000;
-  border-bottom: 2px solid #000;
-  padding: 10px 15px;
-  font-weight: bold;
-  font-size: 1.1rem;
+  background-color: rgba(243, 139, 168, 0.1);
+  color: var(--color-literal);
+  border-bottom: 1px solid rgba(243, 139, 168, 0.2);
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  display: none;
 }
 
 /* ----------------------------------
@@ -180,34 +225,78 @@ h1 {
 ----------------------------------- */
 #autocomplete-list {
   position: absolute;
-  bottom: 100%; /* Anchor right above the input */
-  left: 0;
-  width: 100%;
-  max-height: 150px;
+  bottom: calc(100% + 12px);
+  left: 12px;
+  width: calc(100% - 24px);
+  max-height: 200px;
   overflow-y: auto;
   margin: 0;
-  padding: 0;
+  padding: 8px;
   list-style: none;
-  background: var(--color-bg);
-  border: 2px solid #000;
-  border-bottom: none;
-  box-shadow: 4px -4px 0px rgba(0, 0, 0, 0.2);
+  background: var(--bg-input);
+  border: var(--ui-border);
+  border-radius: 8px;
+  box-shadow: var(--ui-shadow);
   z-index: 20;
+  backdrop-filter: blur(10px);
 }
 
 #autocomplete-list li {
-  padding: 8px 16px;
+  padding: 10px 16px;
   cursor: pointer;
-  color: var(--color-text);
-  border-bottom: 1px solid #ddd;
-}
-
-#autocomplete-list li:last-child {
-  border-bottom: none;
+  color: var(--text-muted);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: all 0.1s ease;
 }
 
 #autocomplete-list li.selected,
 #autocomplete-list li:hover {
-  background-color: var(--color-keyword);
-  color: #fff;
+  background-color: rgba(203, 166, 247, 0.15);
+  color: var(--text-accent);
+}
+
+/* ----------------------------------
+   Drawer Animation & Toggle
+----------------------------------- */
+#ui-overlay {
+  /* Add this transition to your existing #ui-overlay block */
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Class applied when the drawer is hidden */
+#ui-overlay.drawer-closed {
+  transform: translateX(-100%);
+}
+
+#drawer-toggle {
+  position: absolute;
+  top: 24px;
+  right: -40px; /* Pushes the button outside the hidden overlay */
+  width: 40px;
+  height: 40px;
+  background: var(--bg-panel);
+  border: var(--ui-border);
+  border-left: none; /* Blends cleanly with the editor edge */
+  border-radius: 0 8px 8px 0;
+  color: var(--text-accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto; /* Ensures it's clickable while the overlay is pointer-events: none */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.2);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+#drawer-toggle:hover {
+  background: rgba(203, 166, 247, 0.15); /* Matches your autocomplete hover */
+}
+
+#drawer-toggle svg {
+  transition: transform 0.3s ease;
 }
