@@ -1,0 +1,93 @@
+REM ==========================================
+REM PIXEL-BASIC: ORBITAL BUFFER SIMULATION
+REM ==========================================
+
+REM 1. Initialize Off-Screen Starfield Buffer
+LET bg_buffer = CREATE_BUFFER(SCR_W, SCR_H)
+
+REM Bind to the background buffer
+BIND_BUFFER bg_buffer
+
+REM Fill deep space background
+FILL_COLOR 10, 10, 15
+DRAW_RECT 0, 0, SCR_W, SCR_H
+
+REM Procedurally generate 100 stars
+FILL_COLOR 255, 255, 255
+NO_STROKE
+LET i = 0
+WHILE i < 100 THEN
+  LET star_x = RND(0, SCR_W)
+  LET star_y = RND(0, SCR_H)
+  LET star_r = RND(1, 3)
+  DRAW_CIRCLE star_x, star_y, star_r
+  i += 1
+END WHILE
+
+REM Return rendering context to the main screen
+BIND_BUFFER 0
+
+REM 2. Define Main Loop State
+LET angle = 0
+LET ship_x = SCR_W / 2
+LET ship_y = SCR_H / 2
+LET is_running = TRUE
+
+PRINT "Starting Orbital Buffer Simulation..."
+
+REM 3. Main Execution Loop
+WHILE is_running == TRUE THEN
+  REM Composite the static starfield buffer onto the screen
+  DRAW_BUFFER bg_buffer, 0, 0, SCR_W, SCR_H
+
+  REM --- ORBITAL MECHANICS ---
+  LET center_x = SCR_W / 2
+  LET center_y = SCR_H / 2
+  LET orbit_rad = 200
+
+  REM Calculate position using trigonometry
+  LET planet_x = center_x + COS(angle) * orbit_rad
+  LET planet_y = center_y + SIN(angle) * orbit_rad
+
+  REM Draw orbital ring
+  NO_FILL
+  STROKE_COLOR 40, 60, 100
+  STROKE_WEIGHT 2
+  DRAW_CIRCLE center_x, center_y, orbit_rad
+
+  REM Draw the orbiting planet
+  FILL_COLOR 230, 80, 80
+  NO_STROKE
+  DRAW_CIRCLE planet_x, planet_y, 25
+
+  REM --- KINEMATICS & MATRIX TRANSFORMS ---
+  REM Smoothly interpolate ship position towards the mouse
+  ship_x = LERP(ship_x, MOUSE_X, 0.08)
+  ship_y = LERP(ship_y, MOUSE_Y, 0.08)
+
+  REM Calculate the heading angle towards the mouse
+  LET dx = MOUSE_X - ship_x
+  LET dy = MOUSE_Y - ship_y
+  LET heading = ATAN2(dy, dx)
+
+  REM Push matrix state, translate, rotate, and draw the ship
+  PUSH_MATRIX
+  TRANSLATE ship_x, ship_y
+  ROTATE heading
+  
+  FILL_COLOR 89, 220, 235
+  STROKE_COLOR 255, 255, 255
+  STROKE_WEIGHT 2
+  DRAW_TRIANGLE 20, 0, -15, 15, -15, -15
+  
+  POP_MATRIX
+
+  REM Advance simulation time
+  angle += 0.03
+  
+  REM Allow termination via escape key (requires is_key_down implementation)
+  IF is_key_down("Escape") THEN
+    is_running = FALSE
+    PRINT "Simulation Terminated."
+  END IF
+END WHILE

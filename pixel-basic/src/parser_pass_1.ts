@@ -25,48 +25,120 @@ export type Scope = {
 export function create_global_scope(
   ctx: CanvasRenderingContext2D,
   keys_down: Set<string>,
-) {
+): Map<string, Callable> {
   const global_symbols = new Map<string, Callable>();
 
-  // --- IO Commands ---
-  global_symbols.set("PRINT", {
+  // --- Rendering State Machine ---
+  const buffers = new Map<
+    number,
+    CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+  >();
+  buffers.set(0, ctx); // 0 is always the main presentation screen
+
+  let next_buffer_id = 1;
+  let active_buffer_id = 0;
+
+  let do_fill = true;
+  let do_stroke = false;
+
+  // Helper to resolve the active target context
+  const get_ctx = () => {
+    const active = buffers.get(active_buffer_id);
+    if (!active)
+      throw new Error(`Buffer ID ${active_buffer_id} does not exist.`);
+    return active;
+  };
+
+  // ==========================================
+  // Buffer Management API
+  // ==========================================
+
+  global_symbols.set("CREATE_BUFFER", {
+    arity: 2,
+    is_native: true,
+    native_fn: (w: number, h: number) => {
+      const offscreen = new OffscreenCanvas(w, h);
+      const off_ctx = offscreen.getContext("2d");
+      if (!off_ctx) return -1;
+      const id = next_buffer_id++;
+      buffers.set(id, off_ctx as OffscreenCanvasRenderingContext2D);
+      return id;
+    },
+  });
+
+  global_symbols.set("BIND_BUFFER", {
     arity: 1,
     is_native: true,
-    native_fn: (...args: any[]) => console.log(...args),
-  });
-
-  global_symbols.set("SCREEN", {
-    is_native: true,
-    arity: 2,
-    // Add whatever native JS canvas logic you need here
-    native_fn: (width: number, height: number) => {
-      console.log(`Setting screen size to ${width}x${height}`);
+    native_fn: (id: number) => {
+      if (buffers.has(id)) active_buffer_id = id;
     },
   });
 
-  // --- Graphics Commands ---
+  global_symbols.set("DRAW_BUFFER", {
+    arity: 5,
+    is_native: true,
+    native_fn: (id: number, x: number, y: number, w: number, h: number) => {
+      const source_ctx = buffers.get(id);
+      if (source_ctx && source_ctx.canvas) {
+        get_ctx().drawImage(source_ctx.canvas, x, y, w, h);
+      }
+    },
+  });
+
+  global_symbols.set("FREE_BUFFER", {
+    arity: 1,
+    is_native: true,
+    native_fn: (id: number) => {
+      if (id !== 0) {
+        buffers.delete(id);
+        if (active_buffer_id === id) active_buffer_id = 0; // Fallback to main screen
+      }
+    },
+  });
+
+  // ==========================================
+  // 2D Graphics API (State & Primitives)
+  // ==========================================
+
   global_symbols.set("FILL_COLOR", {
+    arity: 3,
     is_native: true,
-    arity: 3, // R, G, B
     native_fn: (r: number, g: number, b: number) => {
-      if (ctx) ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      get_ctx().fillStyle = `rgb(${r}, ${g}, ${b})`;
+      do_fill = true;
     },
   });
 
-  global_symbols.set("DRAW_RECT", {
+  global_symbols.set("STROKE_COLOR", {
+    arity: 3,
     is_native: true,
-    arity: 4, // X, Y, W, H
-    native_fn: (x: number, y: number, w: number, h: number) => {
-      if (ctx) ctx.fillRect(x, y, w, h);
+    native_fn: (r: number, g: number, b: number) => {
+      get_ctx().strokeStyle = `rgb(${r}, ${g}, ${b})`;
+      do_stroke = true;
     },
   });
 
-  global_symbols.set("PSET", {
+  global_symbols.set("STROKE_WEIGHT", {
+    arity: 1,
     is_native: true,
-    arity: 3, // Requires X, Y, and Color
-    native_fn: (x: number, y: number, color: number[]) => {
-      ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-      ctx.fillRect(x, y, 1, 1);
+    native_fn: (w: number) => {
+      get_ctx().lineWidth = w;
+    },
+  });
+
+  global_symbols.set("NO_FILL", {
+    arity: 0,
+    is_native: true,
+    native_fn: () => {
+      do_fill = false;
+    },
+  });
+
+  global_symbols.set("NO_STROKE", {
+    arity: 0,
+    is_native: true,
+    native_fn: () => {
+      do_stroke = false;
     },
   });
 
@@ -74,28 +146,157 @@ export function create_global_scope(
     arity: 0,
     is_native: true,
     native_fn: () => {
-      ctx.fillStyle = "#111"; // Use your default editor bg color
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      const c = get_ctx();
+      c.clearRect(0, 0, c.canvas.width, c.canvas.height);
     },
   });
 
-  // Then register the native function in your global scope:
-  global_symbols.set("is_key_down", {
+  global_symbols.set("DRAW_RECT", {
+    arity: 4,
     is_native: true,
-    arity: 1,
-    native_fn: (key: string) => keys_down.has(key),
+    native_fn: (x: number, y: number, w: number, h: number) => {
+      const c = get_ctx();
+      if (do_fill) c.fillRect(x, y, w, h);
+      if (do_stroke) c.strokeRect(x, y, w, h);
+    },
   });
 
-  // --- Math Commands ---
-  const math_funcs = ["SIN", "COS", "TAN", "ATAN2"];
-  for (const func of math_funcs) {
-    global_symbols.set(func, {
-      arity: -1,
-      is_native: true,
-      // Map the string directly to the Math object method
-      native_fn: Math[func.toLowerCase() as keyof Math] as any,
-    });
-  }
+  global_symbols.set("DRAW_CIRCLE", {
+    arity: 3,
+    is_native: true,
+    native_fn: (x: number, y: number, radius: number) => {
+      const c = get_ctx();
+      c.beginPath();
+      c.arc(x, y, radius, 0, Math.PI * 2);
+      if (do_fill) c.fill();
+      if (do_stroke) c.stroke();
+    },
+  });
+
+  global_symbols.set("DRAW_LINE", {
+    arity: 4,
+    is_native: true,
+    native_fn: (x1: number, y1: number, x2: number, y2: number) => {
+      const c = get_ctx();
+      c.beginPath();
+      c.moveTo(x1, y1);
+      c.lineTo(x2, y2);
+      if (do_stroke) c.stroke();
+    },
+  });
+
+  global_symbols.set("DRAW_TRIANGLE", {
+    arity: 6,
+    is_native: true,
+    native_fn: (
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+      x3: number,
+      y3: number,
+    ) => {
+      const c = get_ctx();
+      c.beginPath();
+      c.moveTo(x1, y1);
+      c.lineTo(x2, y2);
+      c.lineTo(x3, y3);
+      c.closePath();
+      if (do_fill) c.fill();
+      if (do_stroke) c.stroke();
+    },
+  });
+
+  // ==========================================
+  // Matrix Transformations
+  // ==========================================
+
+  global_symbols.set("PUSH_MATRIX", {
+    arity: 0,
+    is_native: true,
+    native_fn: () => get_ctx().save(),
+  });
+
+  global_symbols.set("POP_MATRIX", {
+    arity: 0,
+    is_native: true,
+    native_fn: () => get_ctx().restore(),
+  });
+
+  global_symbols.set("TRANSLATE", {
+    arity: 2,
+    is_native: true,
+    native_fn: (x: number, y: number) => get_ctx().translate(x, y),
+  });
+
+  global_symbols.set("ROTATE", {
+    arity: 1,
+    is_native: true,
+    native_fn: (angle: number) => get_ctx().rotate(angle),
+  });
+
+  // ==========================================
+  // Extended Mathematics API
+  // ==========================================
+
+  global_symbols.set("SQRT", {
+    arity: 1,
+    is_native: true,
+    native_fn: Math.sqrt,
+  });
+  global_symbols.set("POW", { arity: 2, is_native: true, native_fn: Math.pow });
+  global_symbols.set("ABS", { arity: 1, is_native: true, native_fn: Math.abs });
+  global_symbols.set("FLOOR", {
+    arity: 1,
+    is_native: true,
+    native_fn: Math.floor,
+  });
+  global_symbols.set("CEIL", {
+    arity: 1,
+    is_native: true,
+    native_fn: Math.ceil,
+  });
+  global_symbols.set("SIN", { arity: 1, is_native: true, native_fn: Math.sin });
+  global_symbols.set("COS", { arity: 1, is_native: true, native_fn: Math.cos });
+  global_symbols.set("TAN", { arity: 1, is_native: true, native_fn: Math.tan });
+  global_symbols.set("ATAN2", {
+    arity: 2,
+    is_native: true,
+    native_fn: Math.atan2,
+  });
+
+  global_symbols.set("CLAMP", {
+    arity: 3,
+    is_native: true,
+    native_fn: (val: number, min: number, max: number) =>
+      Math.max(min, Math.min(max, val)),
+  });
+
+  global_symbols.set("LERP", {
+    arity: 3,
+    is_native: true,
+    native_fn: (start: number, end: number, amt: number) =>
+      start + (end - start) * amt,
+  });
+
+  global_symbols.set("RND", {
+    arity: 2,
+    is_native: true,
+    native_fn: (min: number, max: number) => Math.random() * (max - min) + min,
+  });
+
+  // Keep existing I/O
+  global_symbols.set("PRINT", {
+    arity: -1, // -1 if you want to support varargs, otherwise set specific arity
+    is_native: true,
+    native_fn: (...args: any[]) => console.log(...args),
+  });
+
+  global_symbols.set("is_key_down", {
+    arity: 1,
+    is_native: true,
+    native_fn: (key: string) => keys_down.has(key),
+  });
 
   return global_symbols;
 }

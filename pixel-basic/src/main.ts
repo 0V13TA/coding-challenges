@@ -1,5 +1,5 @@
 import "./style.css";
-import ExampleSource from "./assets/practice.basic?raw";
+import ExampleSource from "./assets/p.basic?raw";
 import { tokenize } from "./tokenizer";
 import { renderEditor, handleCommand, getSuggestions } from "./editor";
 import {
@@ -85,6 +85,22 @@ const global_env = create_environment(
   null,
   create_global_scope(ctx, keys_down),
 );
+// Define static mathematical constants
+global_env.define("PI", Math.PI);
+global_env.define("HALF_PI", Math.PI / 2);
+global_env.define("TWO_PI", Math.PI * 2);
+
+// Initialize dynamic system variables
+global_env.define("SCR_W", canvas.width);
+global_env.define("SCR_H", canvas.height);
+global_env.define("MOUSE_X", 0);
+global_env.define("MOUSE_Y", 0);
+
+// Update mouse variables asynchronously without blocking the loop
+window.addEventListener("mousemove", (e) => {
+  global_env.assign("MOUSE_X", e.clientX);
+  global_env.assign("MOUSE_Y", e.clientY);
+});
 hoist_program(ast, global_env);
 const interpreter = evaluate_program(ast, global_env);
 
