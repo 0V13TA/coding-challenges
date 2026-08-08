@@ -113,4 +113,7 @@ export function renderEditor(
     lineRow.appendChild(codeSpan);
     commandsContainer.appendChild(lineRow);
   }
+
+  // Auto-scroll the container to maintain focus on the latest execution line
+  commandsContainer.scrollTop = commandsContainer.scrollHeight;
 }

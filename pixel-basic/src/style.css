@@ -1,25 +1,29 @@
 :root {
   /* Minimalist Muted Dark Palette */
   --bg-base: #11111b;
-  --bg-panel: rgba(30, 30, 46, 0.75);
-  --bg-input: rgba(24, 24, 37, 0.9);
-
+  --bg-panel: rgba(
+    17,
+    17,
+    27,
+    0.65
+  ); /* Increased transparency for canvas visibility */
+  --bg-input: rgba(24, 24, 37, 0.95);
   --text-main: #cdd6f4;
   --text-muted: #6c7086;
   --text-accent: #cba6f7;
 
   /* Syntax Highlighting */
-  --color-keyword: #cba6f7; /* Purple */
-  --color-function: #89b4fa; /* Blue */
-  --color-variable: #f9e2af; /* Yellow */
-  --color-comment: #a6adc8; /* Muted Grey/Blue */
-  --color-operator: #89dceb; /* Sky */
-  --color-literal: #f38ba8; /* Red */
+  --color-keyword: #cba6f7;
+  --color-function: #89b4fa;
+  --color-variable: #f9e2af;
+  --color-comment: #a6adc8;
+  --color-operator: #89dceb;
+  --color-literal: #f38ba8;
 
-  --ui-border: 1px solid rgba(255, 255, 255, 0.1);
-  --ui-radius: 12px;
-  --ui-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-
+  /* Flat, Raw Geometry */
+  --ui-border: 2px solid var(--text-accent);
+  --ui-radius: 0px; /* Removed border radius for a sharp, window-manager aesthetic */
+  --ui-shadow: 10px 10px 0px rgba(0, 0, 0, 0.6);
   --font-mono: "JetBrains Mono", "Fira Code", "Courier New", monospace;
 }
 
@@ -36,9 +40,7 @@ body {
   color: var(--text-main);
 }
 
-/* ----------------------------------
-   Syntax Tokens
------------------------------------ */
+/* Syntax Tokens */
 .token-keyword {
   color: var(--color-keyword);
   font-weight: 600;
@@ -64,9 +66,6 @@ body {
   color: var(--text-main);
 }
 
-/* ----------------------------------
-   Canvas Layer
------------------------------------ */
 #graphics-canvas {
   position: absolute;
   top: 0;
@@ -77,37 +76,32 @@ body {
   background-color: var(--bg-base);
 }
 
-/* ----------------------------------
-   UI Overlay Layer
------------------------------------ */
+/* Floating Centered Panel */
 #ui-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 40vw; /* Slimmer, more focused width */
-  min-width: 400px;
-  height: 100vh;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 50vw;
+  min-width: 600px;
+  height: 75vh;
   z-index: 10;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 0;
   box-sizing: border-box;
+  pointer-events: none;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s ease;
+}
+
+#ui-overlay.drawer-closed {
+  transform: translate(-50%, -45%) scale(0.98);
+  opacity: 0;
   pointer-events: none;
 }
 
-h1 {
-  margin: 0 0 20px 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-accent);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  pointer-events: auto;
-}
-
-/* ----------------------------------
-   Editor Layout
------------------------------------ */
 #editor-container {
   flex: 1;
   display: flex;
@@ -116,10 +110,23 @@ h1 {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: var(--ui-border);
-  border-radius: var(--ui-radius);
   box-shadow: var(--ui-shadow);
   pointer-events: auto;
   overflow: hidden;
+}
+
+/* Header styled as a minimalist status indicator */
+h1 {
+  margin: 0;
+  padding: 12px 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: var(--bg-input);
+  border-bottom: 2px solid var(--text-accent);
+  user-select: none;
 }
 
 #commands-container {
@@ -128,28 +135,24 @@ h1 {
   display: flex;
   flex-direction: column;
   padding: 16px 0;
+  scroll-behavior: smooth;
 }
 
-/* Hide scrollbar for a cleaner look */
+/* Hide scrollbar for a raw terminal look */
 #commands-container::-webkit-scrollbar {
-  width: 6px;
-}
-#commands-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  width: 0px;
 }
 
-/* Individual Line Grid */
 .command-line {
   display: grid;
-  grid-template-columns: 50px 1fr;
+  grid-template-columns: 60px 1fr;
   min-height: 28px;
   align-items: center;
-  transition: background 0.2s ease;
+  transition: background 0.1s ease;
 }
 
 .command-line:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .line-number {
@@ -165,14 +168,12 @@ h1 {
   line-height: 1.5;
 }
 
-/* ----------------------------------
-   Input Form
------------------------------------ */
+/* Input Form */
 #input-form {
   display: flex;
   background: var(--bg-input);
-  border-top: var(--ui-border);
-  padding: 8px;
+  border-top: 2px solid var(--text-accent);
+  padding: 0;
 }
 
 #input {
@@ -180,123 +181,156 @@ h1 {
   border: none;
   background: transparent;
   color: var(--text-main);
-  padding: 12px;
+  padding: 16px 20px;
   font-family: inherit;
   font-size: 1rem;
   outline: none;
 }
 
+/* Hide the physical submit button to rely purely on keyboard execution */
 #submit-button {
-  border: none;
-  background: var(--text-accent);
-  color: var(--bg-base);
-  border-radius: 6px;
-  padding: 0 20px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    opacity 0.2s ease,
-    transform 0.1s ease;
-}
-
-#submit-button:hover {
-  opacity: 0.9;
-}
-
-#submit-button:active {
-  transform: scale(0.96);
-}
-
-/* ----------------------------------
-   Error Display
------------------------------------ */
-#error-display {
-  background-color: rgba(243, 139, 168, 0.1);
-  color: var(--color-literal);
-  border-bottom: 1px solid rgba(243, 139, 168, 0.2);
-  padding: 12px 20px;
-  font-size: 0.9rem;
   display: none;
 }
 
-/* ----------------------------------
-   Autocomplete UI
------------------------------------ */
+/* Error Display */
+#error-display {
+  background-color: rgba(243, 139, 168, 0.15);
+  color: var(--color-literal);
+  border-bottom: 2px solid var(--color-literal);
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: none;
+}
+
+/* Autocomplete UI */
 #autocomplete-list {
   position: absolute;
   bottom: calc(100% + 12px);
-  left: 12px;
-  width: calc(100% - 24px);
-  max-height: 200px;
+  left: 0;
+  width: 100%;
+  max-height: 250px;
   overflow-y: auto;
   margin: 0;
-  padding: 8px;
+  padding: 0;
   list-style: none;
   background: var(--bg-input);
-  border: var(--ui-border);
-  border-radius: 8px;
+  border: 2px solid var(--text-accent);
   box-shadow: var(--ui-shadow);
   z-index: 20;
-  backdrop-filter: blur(10px);
+}
+
+#autocomplete-list::-webkit-scrollbar {
+  width: 0px;
 }
 
 #autocomplete-list li {
-  padding: 10px 16px;
+  padding: 12px 20px;
   cursor: pointer;
   color: var(--text-muted);
-  border-radius: 6px;
   font-size: 0.9rem;
-  transition: all 0.1s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 #autocomplete-list li.selected,
 #autocomplete-list li:hover {
-  background-color: rgba(203, 166, 247, 0.15);
-  color: var(--text-accent);
-}
-
-/* ----------------------------------
-   Drawer Animation & Toggle
------------------------------------ */
-#ui-overlay {
-  /* Add this transition to your existing #ui-overlay block */
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Class applied when the drawer is hidden */
-#ui-overlay.drawer-closed {
-  transform: translateX(-100%);
+  background-color: var(--text-accent);
+  color: var(--bg-base);
+  font-weight: bold;
 }
 
 #drawer-toggle {
+  display: none;
+}
+
+/* Floating HUD Toggle Button */
+#hud-toggle {
   position: absolute;
-  top: 24px;
-  right: -40px; /* Pushes the button outside the hidden overlay */
-  width: 40px;
-  height: 40px;
-  background: var(--bg-panel);
-  border: var(--ui-border);
-  border-left: none; /* Blends cleanly with the editor edge */
-  border-radius: 0 8px 8px 0;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: var(--bg-input);
   color: var(--text-accent);
+  border: 2px solid var(--text-accent);
+  padding: 8px 18px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto; /* Ensures it's clickable while the overlay is pointer-events: none */
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.6);
+  user-select: none;
   transition:
-    background 0.2s ease,
-    color 0.2s ease;
+    background 0.1s ease,
+    color 0.1s ease,
+    transform 0.1s ease;
 }
 
-#drawer-toggle:hover {
-  background: rgba(203, 166, 247, 0.15); /* Matches your autocomplete hover */
+#hud-toggle:hover {
+  background: var(--text-accent);
+  color: var(--bg-base);
 }
 
-#drawer-toggle svg {
-  transition: transform 0.3s ease;
+#hud-toggle:active {
+  transform: translate(-50%, 2px);
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.6);
+}
+
+/* ----------------------------------
+   Mobile & Responsive Layout
+----------------------------------- */
+@media (max-width: 768px) {
+  /* Scale panel overlay to fit small screens using dynamic viewport height */
+  #ui-overlay {
+    width: 92vw;
+    min-width: 0;
+    height: 80dvh;
+  }
+
+  /* Compact grid for line numbers on narrow displays */
+  .command-line {
+    grid-template-columns: 42px 1fr;
+    min-height: 24px;
+  }
+
+  .line-number {
+    padding-right: 10px;
+    font-size: 0.75rem;
+  }
+
+  .command {
+    font-size: 0.88rem;
+    word-break: break-word;
+  }
+
+  /* Compact status header */
+  h1 {
+    padding: 10px 14px;
+    font-size: 0.85rem;
+  }
+
+  /* Minimum 16px font prevents iOS Safari from automatically zooming into inputs on focus */
+  #input {
+    font-size: 16px;
+    padding: 14px;
+  }
+
+  /* Larger touch target for the top HUD button */
+  #hud-toggle {
+    top: 10px;
+    padding: 10px 16px;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+  }
+
+  /* Constrain autocomplete panel on small portrait viewports */
+  #autocomplete-list {
+    max-height: 160px;
+  }
+
+  #autocomplete-list li {
+    padding: 10px 14px;
+    font-size: 0.85rem;
+  }
 }

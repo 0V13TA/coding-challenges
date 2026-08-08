@@ -1,7 +1,12 @@
 import "./style.css";
 import ExampleSource from "./assets/p.basic?raw";
 import { tokenize } from "./tokenizer";
-import { renderEditor, handleCommand, getSuggestions } from "./editor";
+import {
+  renderEditor,
+  handleCommand,
+  getSuggestions,
+  COMMANDS,
+} from "./editor";
 import {
   define_builtin_functions,
   Errors,
@@ -21,33 +26,57 @@ const commandsContainer = document.getElementById(
 
 const uiOverlay = document.getElementById("ui-overlay") as HTMLElement;
 
-// Create and inject the drawer toggle button
+// Create top HUD overlay button
+const hudToggle = document.getElementById("hud-toggle") as HTMLButtonElement;
+
+const toggleEditorState = () => {
+  uiOverlay.classList.toggle("drawer-closed");
+  const isClosed = uiOverlay.classList.contains("drawer-closed");
+
+  if (!isClosed) {
+    setTimeout(() => inputElement.focus(), 50);
+  } else {
+    inputElement.blur();
+  }
+};
+
+// Wire HUD button click handler
+hudToggle.addEventListener("click", toggleEditorState);
+
+// Refactor keyboard toggle to use the shared state function
 if (uiOverlay) {
-  const drawerToggle = document.createElement("button");
-  drawerToggle.id = "drawer-toggle";
-  drawerToggle.title = "Toggle Editor";
-
-  // Default icon (pointing left to indicate it will close)
-  drawerToggle.innerHTML = `
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M15 18l-6-6 6-6"/>
-    </svg>
-  `;
-
-  uiOverlay.appendChild(drawerToggle);
-
-  // Toggle logic
-  drawerToggle.addEventListener("click", () => {
-    uiOverlay.classList.toggle("drawer-closed");
-
-    const isClosed = uiOverlay.classList.contains("drawer-closed");
-    // Flip the chevron icon depending on the drawer state
-    drawerToggle.innerHTML = isClosed
-      ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`
-      : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`;
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "`") {
+      e.preventDefault();
+      toggleEditorState();
+    }
   });
 }
 
+COMMANDS.RUN = () => {
+  uiOverlay.classList.add("drawer-closed");
+  inputElement.blur();
+};
+
+// Create and inject the drawer toggle button
+if (uiOverlay) {
+  // Toggle UI overlay via Backquote (`) key for a raw terminal flow
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "`") {
+      e.preventDefault(); // Prevent typing backticks into the input
+      uiOverlay.classList.toggle("drawer-closed");
+
+      const isClosed = uiOverlay.classList.contains("drawer-closed");
+
+      if (!isClosed) {
+        // Yield execution momentarily to allow CSS transform to begin before focusing
+        setTimeout(() => inputElement.focus(), 50);
+      } else {
+        inputElement.blur();
+      }
+    }
+  });
+}
 // New UI Elements
 const errorDisplay = document.getElementById("error-display") as HTMLElement;
 const autocompleteList = document.getElementById(
@@ -97,11 +126,36 @@ global_env.define("SCR_H", canvas.height);
 global_env.define("MOUSE_X", 0);
 global_env.define("MOUSE_Y", 0);
 
-// Update mouse variables asynchronously without blocking the loop
+// Update mouse & touch pointer variables asynchronously
+const updatePointerCoordinates = (clientX: number, clientY: number) => {
+  global_env.assign("MOUSE_X", clientX);
+  global_env.assign("MOUSE_Y", clientY);
+};
+
 window.addEventListener("mousemove", (e) => {
-  global_env.assign("MOUSE_X", e.clientX);
-  global_env.assign("MOUSE_Y", e.clientY);
+  updatePointerCoordinates(e.clientX, e.clientY);
 });
+
+// Map touch events to canvas pointer coordinates
+window.addEventListener(
+  "touchstart",
+  (e) => {
+    if (e.touches.length > 0) {
+      updatePointerCoordinates(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  },
+  { passive: true },
+);
+
+window.addEventListener(
+  "touchmove",
+  (e) => {
+    if (e.touches.length > 0) {
+      updatePointerCoordinates(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  },
+  { passive: true },
+);
 hoist_program(ast, global_env);
 const interpreter = evaluate_program(ast, global_env);
 
