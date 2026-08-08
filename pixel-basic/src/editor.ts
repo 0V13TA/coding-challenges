@@ -1,4 +1,6 @@
-import { KEYWORDS } from "./tokenizer";
+import { pass_1_scope_analysis, type Scope } from "./parser_pass_1";
+import type { Environment } from "./runtime";
+import { KEYWORDS, tokenize } from "./tokenizer";
 
 export const COMMANDS = {
   RUN: () => console.log("RUN"),
@@ -8,9 +10,32 @@ export const COMMANDS = {
 };
 
 // Autocomplete helper
-export function getSuggestions(prefix: string): string[] {
+export function getSuggestions(
+  prefix: string,
+  env: Environment | null,
+  scopes: Scope[],
+): string[] {
   if (!prefix) return [];
-  const allCommands = [...Object.keys(COMMANDS), ...KEYWORDS];
+  let variables: string[] = [],
+    functions: string[] = [];
+  if (env) {
+    for (const keys of env.values.keys()) variables.push(keys);
+    for (const funcs of env.functionMap.keys()) functions.push(funcs);
+  }
+  const symbols: Set<string> = new Set();
+
+  scopes.forEach((scope) => {
+    for (const symbol of scope.symbols.keys()) symbols.add(symbol);
+  });
+
+  const allCommands = [
+    ...symbols,
+    ...KEYWORDS,
+    ...variables,
+    ...functions,
+    ...Object.keys(COMMANDS),
+  ];
+
   return allCommands.filter((cmd) =>
     cmd.toLowerCase().startsWith(prefix.toLowerCase()),
   );
@@ -19,6 +44,7 @@ export function getSuggestions(prefix: string): string[] {
 export function handleCommand(
   command: string,
   programMap: Map<number, string>,
+  env: Environment | null,
 ): { lineNumber?: number; error?: string } {
   const cmd = command.trim();
 
@@ -44,7 +70,18 @@ export function handleCommand(
   }
 
   // 3. Error handling with existing Levenshtein logic
-  const allCommands = [...Object.keys(COMMANDS), ...KEYWORDS];
+  let variables: string[] = [],
+    functions: string[] = [];
+  if (env) {
+    for (const keys of env.values.keys()) variables.push(keys);
+    for (const funcs of env.functionMap.keys()) functions.push(funcs);
+  }
+  const allCommands = [
+    ...KEYWORDS,
+    ...variables,
+    ...functions,
+    ...Object.keys(COMMANDS),
+  ];
   let closestMatch: string = "";
 
   for (const knownCommand of allCommands) {
@@ -117,7 +154,10 @@ export function renderEditor(
 
     const codeSpan = document.createElement("div");
     codeSpan.className = "command";
-    codeSpan.textContent = programMap.get(lineNum) || "";
+
+    // Process raw text buffer into color-coded DOM elements
+    const rawCode = programMap.get(lineNum) || "";
+    codeSpan.innerHTML = highlightLine(rawCode);
 
     lineRow.appendChild(numSpan);
     lineRow.appendChild(codeSpan);
@@ -186,6 +226,8 @@ export function handleAutocompleteNavigation(
   commandsContainer: HTMLElement,
   inputElement: HTMLInputElement,
   autocompleteList: HTMLUListElement,
+  env: Environment | null,
+  scopes: Scope[],
 ) {
   if (inputForm && inputElement && commandsContainer) {
     // 1. Handle Typing (Autocomplete Filtering)
@@ -195,7 +237,12 @@ export function handleAutocompleteNavigation(
       const currentWord = words[words.length - 1]; // Only autocomplete the active word
 
       if (currentWord.length > 0) {
-        currentSuggestions = getSuggestions(currentWord);
+        let source = "";
+        for (const val of programMap.values()) source += val + "\n";
+        const { tokens } = tokenize(source);
+        pass_1_scope_analysis(tokens, scopes);
+
+        currentSuggestions = getSuggestions(currentWord, env, scopes);
         selectedIndex = currentSuggestions.length > 0 ? 0 : -1;
         renderAutocomplete(
           selectedIndex,
@@ -255,7 +302,7 @@ export function handleAutocompleteNavigation(
       if (!rawInput) return;
 
       // Execute command and get result object
-      const result = handleCommand(rawInput, programMap);
+      const result = handleCommand(rawInput, programMap, env);
 
       // Toggle Error UI
       if (result.error) {
@@ -270,4 +317,62 @@ export function handleAutocompleteNavigation(
       hideAutocomplete(autocompleteList, currentSuggestions, selectedIndex);
     });
   }
+}
+
+const ESCAPE_MAP: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+function escapeHtml(str: string) {
+  return str.replace(/[&<>"']/g, (m) => ESCAPE_MAP[m]);
+}
+
+export function highlightLine(code: string): string {
+  // Dynamically pull keywords from the core tokenizer
+  const keywords = Array.from(KEYWORDS).join("|");
+
+  // Register known system functions and mathematical constants
+  const builtins =
+    "CREATE_BUFFER|BIND_BUFFER|DRAW_BUFFER|FREE_BUFFER|FILL_COLOR|STROKE_COLOR|STROKE_WEIGHT|NO_FILL|NO_STROKE|CLEAR_SCREEN|DRAW_RECT|DRAW_CIRCLE|DRAW_LINE|DRAW_TRIANGLE|PUSH_MATRIX|POP_MATRIX|TRANSLATE|ROTATE|SQRT|POW|ABS|FLOOR|CEIL|SIN|COS|TAN|ATAN2|CLAMP|LERP|RND|PRINT|IS_KEY_DOWN|PI|TWO_PI|HALF_PI|MOUSE_X|MOUSE_Y|SCR_W|SCR_H";
+
+  // Isolate boundaries: Comments, Strings, Keywords, Built-ins, Booleans, Numbers, Operators, Whitespace
+  const regex = new RegExp(
+    `(REM.*|"[^"]*"|'[^']*'|\\b(?:${keywords})\\b|\\b(?:${builtins})\\b|\\b(?:TRUE|FALSE)\\b|\\b\\d+(?:\\.\\d+)?\\b|[+\\-*/%<>=!&|^~\\[\\](){},:]+|\\s+)`,
+  );
+
+  const tokens = code.split(regex);
+  let html = "";
+
+  for (const token of tokens) {
+    if (!token) continue;
+
+    if (token.startsWith("REM")) {
+      html += `<span class="token-comment">${escapeHtml(token)}</span>`;
+    } else if (
+      token.startsWith('"') ||
+      token.startsWith("'") ||
+      token === "TRUE" ||
+      token === "FALSE" ||
+      /^\d+(?:\.\d+)?$/.test(token)
+    ) {
+      html += `<span class="token-literal">${escapeHtml(token)}</span>`;
+    } else if (KEYWORDS.has(token)) {
+      html += `<span class="token-keyword">${escapeHtml(token)}</span>`;
+    } else if (new RegExp(`^(?:${builtins})$`).test(token)) {
+      html += `<span class="token-function">${escapeHtml(token)}</span>`;
+    } else if (/^[+\-*/%<>=!&|^~\[\](){},:]+$/.test(token)) {
+      html += `<span class="token-operator">${escapeHtml(token)}</span>`;
+    } else if (token.trim() === "") {
+      // Preserve layout spacing accurately
+      html += token;
+    } else {
+      // Unmatched tokens are treated as user-defined IDs/variables
+      html += `<span class="token-variable">${escapeHtml(token)}</span>`;
+    }
+  }
+  return html;
 }

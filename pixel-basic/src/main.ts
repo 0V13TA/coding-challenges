@@ -107,6 +107,20 @@ let currentSuggestions: string[] = [];
 let animation_frame_id: number | null = null;
 let active_env: Environment | null = null;
 
+// Generate a fresh environment for every run
+active_env = create_environment(null, define_builtin_functions(ctx, keys_down));
+define_builtin_constants(active_env, canvas.width, canvas.height);
+
+let scopes: Scope[] = [
+  {
+    id: 0,
+    parent_id: null,
+    start_token: 0,
+    end_token: 0,
+    symbols: new Map<string, SymbolEntry>(),
+  },
+];
+
 // --- Language Setup & Parsing Pipeline ---
 function compile_and_run(source_code: string) {
   // Halt any previously running instance
@@ -121,16 +135,6 @@ function compile_and_run(source_code: string) {
     define_builtin_functions(ctx, keys_down),
   );
   define_builtin_constants(active_env, canvas.width, canvas.height);
-
-  let scopes: Scope[] = [
-    {
-      id: 0,
-      parent_id: null,
-      start_token: 0,
-      end_token: 0,
-      symbols: new Map<string, SymbolEntry>(),
-    },
-  ];
 
   // Pipeline execution
   const { tokens } = tokenize(source_code);
@@ -225,4 +229,6 @@ handleAutocompleteNavigation(
   commandsContainer,
   inputElement,
   autocompleteList,
+  active_env,
+  scopes,
 );
