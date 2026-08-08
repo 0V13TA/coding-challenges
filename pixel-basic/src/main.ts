@@ -3,7 +3,7 @@ import ExampleSource from "./assets/p.basic?raw";
 import { tokenize } from "./tokenizer";
 import { renderEditor, handleCommand, getSuggestions } from "./editor";
 import {
-  create_global_scope,
+  define_builtin_functions,
   Errors,
   pass_1_scope_analysis,
   type Scope,
@@ -81,9 +81,10 @@ console.log("Errors:", Errors);
 import { create_environment } from "./runtime";
 import { evaluate_program, hoist_program } from "./evaluator";
 
+resizeCanvas();
 const global_env = create_environment(
   null,
-  create_global_scope(ctx, keys_down),
+  define_builtin_functions(ctx, keys_down),
 );
 // Define static mathematical constants
 global_env.define("PI", Math.PI);
@@ -151,7 +152,6 @@ function resizeCanvas() {
   }
 }
 window.addEventListener("resize", resizeCanvas);
-resizeCanvas();
 requestAnimationFrame(engine_tick);
 
 function hideAutocomplete() {

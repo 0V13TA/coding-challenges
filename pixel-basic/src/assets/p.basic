@@ -34,6 +34,7 @@ LET ship_y = SCR_H / 2
 LET is_running = TRUE
 
 PRINT "Starting Orbital Buffer Simulation..."
+PRINT SCR_H, SCR_W
 
 REM 3. Main Execution Loop
 WHILE is_running == TRUE THEN
@@ -86,7 +87,7 @@ WHILE is_running == TRUE THEN
   angle += 0.03
   
   REM Allow termination via escape key (requires is_key_down implementation)
-  IF is_key_down("Escape") THEN
+  IF IS_KEY_DOWN("Escape") THEN
     is_running = FALSE
     PRINT "Simulation Terminated."
   END IF

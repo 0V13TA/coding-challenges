@@ -22,7 +22,7 @@ export type Scope = {
   symbols: Map<string, SymbolEntry>;
 };
 
-export function create_global_scope(
+export function define_builtin_functions(
   ctx: CanvasRenderingContext2D,
   keys_down: Set<string>,
 ): Map<string, Callable> {
@@ -292,7 +292,7 @@ export function create_global_scope(
     native_fn: (...args: any[]) => console.log(...args),
   });
 
-  global_symbols.set("is_key_down", {
+  global_symbols.set("IS_KEY_DOWN", {
     arity: 1,
     is_native: true,
     native_fn: (key: string) => keys_down.has(key),
