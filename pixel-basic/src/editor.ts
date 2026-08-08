@@ -90,6 +90,16 @@ function levenshteinDistance(a: string, b: string): number {
   return matrix[rows * cols - 1];
 }
 
+function hideAutocomplete(
+  autocompleteList: HTMLUListElement,
+  currentSuggestions: string[],
+  selectedIndex: number,
+) {
+  autocompleteList.style.display = "none";
+  currentSuggestions.splice(0);
+  selectedIndex = -1;
+}
+
 export function renderEditor(
   programMap: Map<number, string>,
   commandsContainer: HTMLElement,
@@ -116,4 +126,148 @@ export function renderEditor(
 
   // Auto-scroll the container to maintain focus on the latest execution line
   commandsContainer.scrollTop = commandsContainer.scrollHeight;
+}
+
+export function renderAutocomplete(
+  selectedIndex: number,
+  currentSuggestions: string[],
+  inputElement: HTMLInputElement,
+  autocompleteList: HTMLUListElement,
+) {
+  if (currentSuggestions.length === 0) {
+    hideAutocomplete(autocompleteList, currentSuggestions, selectedIndex);
+    return;
+  }
+
+  autocompleteList.innerHTML = "";
+  autocompleteList.style.display = "flex";
+
+  currentSuggestions.forEach((suggestion, index) => {
+    const li = document.createElement("li");
+    li.textContent = suggestion;
+    if (index === selectedIndex) {
+      li.classList.add("selected");
+    }
+
+    li.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // Prevent input from losing focus
+      applySuggestion(
+        suggestion,
+        inputElement,
+        selectedIndex,
+        currentSuggestions,
+        autocompleteList,
+      );
+    });
+    autocompleteList.appendChild(li);
+  });
+}
+
+export function applySuggestion(
+  suggestion: string,
+  inputElement: HTMLInputElement,
+  selectedIndex: number,
+  currentSuggestions: string[],
+  autocompleteList: HTMLUListElement,
+) {
+  const words = inputElement.value.split(" ");
+  words[words.length - 1] = suggestion; // Replace currently typing word
+  inputElement.value = words.join(" ") + " ";
+  hideAutocomplete(autocompleteList, currentSuggestions, selectedIndex);
+  inputElement.focus();
+}
+
+export function handleAutocompleteNavigation(
+  selectedIndex: number,
+  currentSuggestions: string[],
+  programMap: Map<number, string>,
+  errorDisplay: HTMLElement,
+  inputForm: HTMLFormElement,
+  commandsContainer: HTMLElement,
+  inputElement: HTMLInputElement,
+  autocompleteList: HTMLUListElement,
+) {
+  if (inputForm && inputElement && commandsContainer) {
+    // 1. Handle Typing (Autocomplete Filtering)
+    inputElement.addEventListener("input", () => {
+      const rawInput = inputElement.value;
+      const words = rawInput.split(" ");
+      const currentWord = words[words.length - 1]; // Only autocomplete the active word
+
+      if (currentWord.length > 0) {
+        currentSuggestions = getSuggestions(currentWord);
+        selectedIndex = currentSuggestions.length > 0 ? 0 : -1;
+        renderAutocomplete(
+          selectedIndex,
+          currentSuggestions,
+          inputElement,
+          autocompleteList,
+        );
+      } else {
+        hideAutocomplete(autocompleteList, currentSuggestions, selectedIndex);
+      }
+    });
+
+    // 2. Handle Keyboard Navigation (Up, Down, Tab, Enter)
+    inputElement.addEventListener("keydown", (e) => {
+      if (currentSuggestions.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          selectedIndex = (selectedIndex + 1) % currentSuggestions.length;
+          renderAutocomplete(
+            selectedIndex,
+            currentSuggestions,
+            inputElement,
+            autocompleteList,
+          );
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          selectedIndex =
+            (selectedIndex - 1 + currentSuggestions.length) %
+            currentSuggestions.length;
+          renderAutocomplete(
+            selectedIndex,
+            currentSuggestions,
+            inputElement,
+            autocompleteList,
+          );
+        } else if (e.key === "Tab" || e.key === "Enter") {
+          if (selectedIndex >= 0) {
+            e.preventDefault();
+            applySuggestion(
+              currentSuggestions[selectedIndex],
+              inputElement,
+              selectedIndex,
+              currentSuggestions,
+              autocompleteList,
+            );
+          }
+        } else if (e.key === "Escape") {
+          hideAutocomplete(autocompleteList, currentSuggestions, selectedIndex);
+        }
+      }
+    });
+
+    // 3. Handle Form Submission
+    inputForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const rawInput = inputElement.value.trim();
+      if (!rawInput) return;
+
+      // Execute command and get result object
+      const result = handleCommand(rawInput, programMap);
+
+      // Toggle Error UI
+      if (result.error) {
+        errorDisplay.textContent = result.error;
+        errorDisplay.style.display = "flex";
+      } else {
+        errorDisplay.style.display = "none";
+        inputElement.value = `${result.lineNumber !== undefined ? result.lineNumber + 10 : ""} `;
+      }
+
+      renderEditor(programMap, commandsContainer);
+      hideAutocomplete(autocompleteList, currentSuggestions, selectedIndex);
+    });
+  }
 }

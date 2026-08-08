@@ -1,4 +1,4 @@
-import type { Callable } from "./runtime";
+import type { Callable, Environment } from "./runtime";
 import type { LexError, Token } from "./tokenizer";
 
 export const Errors: LexError[] = [];
@@ -299,6 +299,23 @@ export function define_builtin_functions(
   });
 
   return global_symbols;
+}
+
+export function define_builtin_constants(
+  global_env: Environment,
+  scr_wdith: number,
+  scr_height: number,
+) {
+  // Define static mathematical constants
+  global_env.define("PI", Math.PI);
+  global_env.define("TWO_PI", Math.PI * 2);
+  global_env.define("HALF_PI", Math.PI / 2);
+
+  // Initialize dynamic system variables
+  global_env.define("MOUSE_X", 0);
+  global_env.define("MOUSE_Y", 0);
+  global_env.define("SCR_W", scr_wdith);
+  global_env.define("SCR_H", scr_height);
 }
 
 export function pass_1_scope_analysis(tokens: Token[], scopes: Scope[]): void {
