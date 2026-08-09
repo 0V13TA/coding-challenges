@@ -74,6 +74,19 @@ export function define_builtin_functions(
     },
   });
 
+  global_symbols.set("SCREEN", {
+    arity: 2,
+    is_native: true,
+    native_fn: (w: number, h: number) => {
+      const offscreen = new OffscreenCanvas(w, h);
+      const off_ctx = offscreen.getContext("2d");
+      if (!off_ctx) return -1;
+      const id = next_buffer_id++;
+      buffers.set(id, off_ctx as OffscreenCanvasRenderingContext2D);
+      if (buffers.has(id)) active_buffer_id = id;
+    },
+  });
+
   global_symbols.set("DRAW_BUFFER", {
     arity: 5,
     is_native: true,

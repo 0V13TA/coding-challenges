@@ -146,7 +146,6 @@ h1 {
 .command-line {
   display: grid;
   grid-template-columns: 60px 1fr;
-  min-height: 28px;
   align-items: center;
   transition: background 0.1s ease;
 }
@@ -243,13 +242,30 @@ h1 {
   display: none;
 }
 
-/* Floating HUD Toggle Button */
-#hud-toggle {
+#hud {
   position: absolute;
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
+  display: flex;
+  gap: 10px;
+}
+
+#hud > div {
+  display: flex;
+  align-content: center;
+  justify-content: center;
+}
+#hud > div label {
+  display: flex;
+  align-content: center;
+  justify-content: center;
+}
+
+/* Floating HUD Toggle Button */
+#hud-toggle,
+#hud > div label {
   background: var(--bg-input);
   color: var(--text-accent);
   border: 2px solid var(--text-accent);
@@ -267,7 +283,8 @@ h1 {
     transform 0.1s ease;
 }
 
-#hud-toggle:hover {
+#hud-toggle:hover,
+#hud > div label:hover {
   background: var(--text-accent);
   color: var(--bg-base);
 }
@@ -291,7 +308,6 @@ h1 {
   /* Compact grid for line numbers on narrow displays */
   .command-line {
     grid-template-columns: 42px 1fr;
-    min-height: 24px;
   }
 
   .line-number {

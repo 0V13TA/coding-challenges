@@ -296,27 +296,51 @@ export function handleAutocompleteNavigation(
     });
 
     // 3. Handle Form Submission
-    inputForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const rawInput = inputElement.value.trim();
-      if (!rawInput) return;
-
-      // Execute command and get result object
-      const result = handleCommand(rawInput, programMap, env);
-
-      // Toggle Error UI
-      if (result.error) {
-        errorDisplay.textContent = result.error;
-        errorDisplay.style.display = "flex";
-      } else {
-        errorDisplay.style.display = "none";
-        inputElement.value = `${result.lineNumber !== undefined ? result.lineNumber + 10 : ""} `;
-      }
-
-      renderEditor(programMap, commandsContainer);
-      hideAutocomplete(autocompleteList, currentSuggestions, selectedIndex);
-    });
+    inputForm.addEventListener("submit", (e) =>
+      handleFormSubmit(
+        e,
+        selectedIndex,
+        currentSuggestions,
+        programMap,
+        errorDisplay,
+        commandsContainer,
+        inputElement,
+        autocompleteList,
+        env,
+      ),
+    );
   }
+}
+
+export function handleFormSubmit(
+  e: Event,
+  selectedIndex: number,
+  currentSuggestions: string[],
+  programMap: Map<number, string>,
+  errorDisplay: HTMLElement,
+  commandsContainer: HTMLElement,
+  inputElement: HTMLInputElement,
+  autocompleteList: HTMLUListElement,
+  env: Environment | null,
+) {
+  e.preventDefault();
+  const rawInput = inputElement.value.trim();
+  if (!rawInput) return;
+
+  // Execute command and get result object
+  const result = handleCommand(rawInput, programMap, env);
+
+  // Toggle Error UI
+  if (result.error) {
+    errorDisplay.textContent = result.error;
+    errorDisplay.style.display = "flex";
+  } else {
+    errorDisplay.style.display = "none";
+    inputElement.value = `${result.lineNumber !== undefined ? result.lineNumber + 10 : ""} `;
+  }
+
+  renderEditor(programMap, commandsContainer);
+  hideAutocomplete(autocompleteList, currentSuggestions, selectedIndex);
 }
 
 const ESCAPE_MAP: Record<string, string> = {

@@ -212,7 +212,7 @@ export function parse_program(tokens: Token[], scopes: Scope[]): Program {
     tokens,
     currentIndex: 0,
     scopes,
-    active_scope_id: 0, // Starts at global scope
+    active_scope_id: 0,
   };
 
   const body: ASTNode[] = [];
@@ -274,7 +274,6 @@ function parse_statement(state: ParserState): ASTNode | null {
       return parse_if(state);
     case "SUB":
       return parse_subroutine(state);
-    // --- New Statements ---
     case "SWITCH":
       return parse_switch(state);
     case "BREAK":
@@ -283,7 +282,6 @@ function parse_statement(state: ParserState): ASTNode | null {
       return parse_continue(state);
     case "RETURN":
       return parse_return(state);
-    // ----------------------
     case "ID":
       return parse_assignment_or_call(state);
     default:
@@ -315,7 +313,6 @@ function parse_declaration(state: ParserState): VariableDeclaration | null {
   );
   if (!assign_token) return null;
 
-  // Handoff cleanly to the Pratt parser for ALL right-hand expressions
   const expression_value = parse_expression(state, 0);
 
   return {

@@ -21,6 +21,7 @@ const inputElement = document.getElementById("input") as HTMLInputElement;
 const inputForm = document.getElementById("input-form") as HTMLFormElement;
 const hudToggle = document.getElementById("hud-toggle") as HTMLButtonElement;
 const errorDisplay = document.getElementById("error-display") as HTMLElement;
+const inputFile = document.getElementById("file-input") as HTMLInputElement;
 const autocompleteList = document.getElementById(
   "autocomplete-list",
 ) as HTMLUListElement;
@@ -42,6 +43,47 @@ const toggleEditorState = () => {
 hudToggle.addEventListener("click", toggleEditorState);
 window.addEventListener("keydown", (e) => keys_down.add(e.key));
 window.addEventListener("keyup", (e) => keys_down.delete(e.key));
+
+inputFile.addEventListener("change", (event) => {
+  const input = event.target as HTMLInputElement;
+  let file: File | null = null;
+  if (input !== null && input.files !== null) {
+    file = input.files[0];
+    if (!file.type.startsWith("text"))
+      errorDisplay.textContent = "File must be a text file";
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    console.log("loaded");
+    const result = reader.result;
+    if (result === null) return;
+    if (typeof result === "string") {
+      const lines = result.split("\n");
+      programMap.clear();
+      lines.forEach((line, index) => programMap.set(index, line));
+      renderEditor(programMap, commandsContainer);
+
+      uiOverlay.classList.remove("drawer-closed");
+      setTimeout(() => inputElement.focus(), 50);
+    }
+  };
+
+  reader.onerror = () => {
+    errorDisplay.textContent = "Failed loading the text file";
+    errorDisplay.style.display = "flex";
+  };
+  reader.onabort = () => {
+    errorDisplay.textContent = "Failed loading the text file";
+    errorDisplay.style.display = "flex";
+  };
+
+  if (file !== null) reader.readAsText(file);
+  else {
+    errorDisplay.textContent = "Failed loading the text file";
+    errorDisplay.style.display = "flex";
+  }
+});
 
 if (uiOverlay) {
   window.addEventListener("keydown", (e) => {
