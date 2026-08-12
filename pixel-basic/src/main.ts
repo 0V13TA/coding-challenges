@@ -3,6 +3,7 @@ import { evaluate_program, hoist_program } from "./evaluator";
 import {
   define_builtin_constants,
   define_builtin_functions,
+  Errors,
   pass_1_scope_analysis,
   type Scope,
   type SymbolEntry,
@@ -60,12 +61,13 @@ inputFile.addEventListener("change", (event) => {
     if (result === null) return;
     if (typeof result === "string") {
       const lines = result.split("\n");
-      programMap.clear();
+      COMMANDS.NEW();
       lines.forEach((line, index) => programMap.set(index, line));
       renderEditor(programMap, commandsContainer);
 
       uiOverlay.classList.remove("drawer-closed");
       setTimeout(() => inputElement.focus(), 50);
+      COMMANDS.RUN();
     }
   };
 
@@ -185,6 +187,7 @@ function compile_and_run(source_code: string) {
 
   hoist_program(ast, active_env);
   const interpreter = evaluate_program(ast, active_env);
+  console.log(Errors);
 
   const TARGET_FPS = 60;
   const STEP_MS = 1000 / TARGET_FPS;
