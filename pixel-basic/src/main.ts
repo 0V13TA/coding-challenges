@@ -1,9 +1,10 @@
-import { COMMANDS, handleAutocompleteNavigation, renderEditor } from "./editor";
+import type { EditorView } from "codemirror";
+import ExampleSource from "./assets/p.basic?raw";
+import { createEditor, serializeEditorState } from "./editor";
 import { evaluate_program, hoist_program } from "./evaluator";
 import {
   define_builtin_constants,
   define_builtin_functions,
-  Errors,
   pass_1_scope_analysis,
   type Scope,
   type SymbolEntry,
@@ -12,182 +13,85 @@ import { parse_program } from "./parser_pass_2";
 import { create_environment, type Environment } from "./runtime";
 import "./style.css";
 import { tokenize } from "./tokenizer";
+import { load_basic_code, save_basic_code } from "./serialize";
 
 const canvas = document.getElementById("graphics-canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 if (!ctx) throw new Error("Sorry but your system does not support HTML Canvas");
 
-const uiOverlay = document.getElementById("ui-overlay") as HTMLElement;
-const inputElement = document.getElementById("input") as HTMLInputElement;
-const inputForm = document.getElementById("input-form") as HTMLFormElement;
-const hudToggle = document.getElementById("hud-toggle") as HTMLButtonElement;
+function resizeCanvas() {
+  canvas.width = canvasWrapper.clientWidth;
+  canvas.height = canvasWrapper.clientHeight;
+}
+
+const canvasWrapper = document.getElementById("canvas-wrapper") as HTMLElement;
+const editorContainer = document.getElementById(
+  "editor-container",
+) as HTMLElement;
 const errorDisplay = document.getElementById("error-display") as HTMLElement;
 const inputFile = document.getElementById("file-input") as HTMLInputElement;
-const autocompleteList = document.getElementById(
-  "autocomplete-list",
-) as HTMLUListElement;
-const commandsContainer = document.getElementById(
-  "commands-container",
-) as HTMLElement;
 
-const toggleEditorState = () => {
-  uiOverlay.classList.toggle("drawer-closed");
-  const isClosed = uiOverlay.classList.contains("drawer-closed");
+const btnRun = document.getElementById("btn-run") as HTMLButtonElement;
+const btnStop = document.getElementById("btn-stop") as HTMLButtonElement;
+const btnSave = document.getElementById("btn-save") as HTMLButtonElement;
 
-  if (!isClosed) {
-    setTimeout(() => inputElement.focus(), 50);
-  } else {
-    inputElement.blur();
-  }
-};
-
-hudToggle.addEventListener("click", toggleEditorState);
-window.addEventListener("keydown", (e) => keys_down.add(e.key));
-window.addEventListener("keyup", (e) => keys_down.delete(e.key));
-
-inputFile.addEventListener("change", (event) => {
-  const input = event.target as HTMLInputElement;
-  let file: File | null = null;
-  if (input !== null && input.files !== null) {
-    file = input.files[0];
-    if (!file.type.startsWith("text"))
-      errorDisplay.textContent = "File must be a text file";
-  }
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    console.log("loaded");
-    const result = reader.result;
-    if (result === null) return;
-    if (typeof result === "string") {
-      const lines = result.split("\n");
-      COMMANDS.NEW();
-      lines.forEach((line, index) => programMap.set(index, line));
-      renderEditor(programMap, commandsContainer);
-
-      uiOverlay.classList.remove("drawer-closed");
-      setTimeout(() => inputElement.focus(), 50);
-      COMMANDS.RUN();
-    }
-  };
-
-  reader.onerror = () => {
-    errorDisplay.textContent = "Failed loading the text file";
-    errorDisplay.style.display = "flex";
-  };
-  reader.onabort = () => {
-    errorDisplay.textContent = "Failed loading the text file";
-    errorDisplay.style.display = "flex";
-  };
-
-  if (file !== null) reader.readAsText(file);
-  else {
-    errorDisplay.textContent = "Failed loading the text file";
-    errorDisplay.style.display = "flex";
-  }
-});
-
-if (uiOverlay) {
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "`") {
-      e.preventDefault();
-      toggleEditorState();
-    }
-  });
-}
-
-// Update mouse & touch pointer variables asynchronously
-const updatePointerCoordinates = (clientX: number, clientY: number) => {
-  if (active_env) {
-    active_env.assign("MOUSE_X", clientX);
-    active_env.assign("MOUSE_Y", clientY);
-  }
-};
-
-addEventListener("mousemove", (e) => {
-  updatePointerCoordinates(e.clientX, e.clientY);
-});
-
-// Map touch events to canvas pointer coordinates
-addEventListener(
-  "touchstart",
-  (e) => {
-    if (e.touches.length > 0) {
-      updatePointerCoordinates(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  },
-  { passive: true },
-);
-
-addEventListener(
-  "touchmove",
-  (e) => {
-    if (e.touches.length > 0) {
-      updatePointerCoordinates(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  },
-  { passive: true },
-);
-
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  if (ctx) {
-    ctx.fillStyle = "#111";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-}
-
-window.addEventListener("resize", resizeCanvas);
-resizeCanvas();
-
-const keys_down = new Set<string>();
-const programMap = new Map<number, string>();
-
-let selectedIndex: number = -1;
-let currentSuggestions: string[] = [];
-
-// --- Execution State ---
+let editorView: EditorView | null = null;
 let animation_frame_id: number | null = null;
 let active_env: Environment | null = null;
+const keys_down = new Set<string>();
 
-// Generate a fresh environment for every run
-active_env = create_environment(null, define_builtin_functions(ctx, keys_down));
-define_builtin_constants(active_env, canvas.width, canvas.height);
-
-let scopes: Scope[] = [
-  {
-    id: 0,
-    parent_id: null,
-    start_token: 0,
-    end_token: 0,
-    symbols: new Map<string, SymbolEntry>(),
-  },
-];
-
-// --- Language Setup & Parsing Pipeline ---
-function compile_and_run(source_code: string) {
-  // Halt any previously running instance
+// --- Execution Pipeline ---
+function stop_engine() {
   if (animation_frame_id !== null) {
     cancelAnimationFrame(animation_frame_id);
     animation_frame_id = null;
   }
+  active_env = null;
+  keys_down.clear();
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  console.log("Engine Halted.");
+}
 
-  // Generate a fresh environment for every run
+function compile_and_run(source_code: string) {
+  stop_engine();
+  resizeCanvas();
+
+  const update_env = (name: string, value: any) => {
+    if (active_env) active_env.assign(name, value);
+  };
+
   active_env = create_environment(
     null,
-    define_builtin_functions(ctx, keys_down),
+    define_builtin_functions(ctx, keys_down, update_env),
   );
   define_builtin_constants(active_env, canvas.width, canvas.height);
+  active_env.assign("SCR_W", canvas.width);
+  active_env.assign("SCR_H", canvas.height);
 
-  // Pipeline execution
-  const { tokens } = tokenize(source_code);
+  let scopes: Scope[] = [
+    {
+      id: 0,
+      parent_id: null,
+      start_token: 0,
+      end_token: 0,
+      symbols: new Map<string, SymbolEntry>(),
+    },
+  ];
+
+  const { tokens, errors: lexErrors } = tokenize(source_code);
+
+  if (lexErrors && lexErrors.length > 0) {
+    errorDisplay.textContent = lexErrors[0].message;
+    errorDisplay.style.display = "flex";
+    return;
+  }
+
   pass_1_scope_analysis(tokens, scopes);
   const ast = parse_program(tokens, scopes);
 
   hoist_program(ast, active_env);
   const interpreter = evaluate_program(ast, active_env);
-  console.log(Errors);
 
   const TARGET_FPS = 60;
   const STEP_MS = 1000 / TARGET_FPS;
@@ -198,12 +102,10 @@ function compile_and_run(source_code: string) {
     let delta_time = current_time - last_time;
     last_time = current_time;
 
-    // Cap delta to avoid death spirals on tab switch
     if (delta_time > 250) delta_time = 250;
     accumulator += delta_time;
     let is_running = true;
 
-    // Process logical frames
     while (accumulator >= STEP_MS) {
       const result = interpreter.next();
       accumulator -= STEP_MS;
@@ -225,55 +127,161 @@ function compile_and_run(source_code: string) {
     }
   }
 
-  // Clear past errors and kick off the engine
   errorDisplay.style.display = "none";
   animation_frame_id = requestAnimationFrame(engine_tick);
 }
 
-// --- Command Bindings ---
-COMMANDS.RUN = () => {
-  uiOverlay.classList.add("drawer-closed");
-  inputElement.blur();
+// --- Editor Setup ---
+const btnToggleEditor = document.getElementById(
+  "btn-toggle-editor",
+) as HTMLButtonElement;
+const dragDivider = document.getElementById("drag-divider") as HTMLElement;
+const editorPane = document.getElementById("editor-pane") as HTMLElement;
 
-  // Extract user code from the editor
-  const values = programMap.values();
-  const programText = Array.from(values).join("\n");
-
-  compile_and_run(programText);
+resizeCanvas();
+const executeCode = () => {
+  if (editorView) compile_and_run(editorView.state.doc.toString());
 };
 
-COMMANDS.STOP = () => {
-  if (animation_frame_id !== null) {
-    cancelAnimationFrame(animation_frame_id);
-    animation_frame_id = null;
-    active_env = null;
-    console.log("Engine Halted.");
+async function initEditor() {
+  resizeCanvas();
+  editorContainer.innerHTML = "";
+
+  // 1. Await database load
+  const savedData = await load_basic_code();
+
+  // 2. Boot from DB if it exists, otherwise fallback to the demo string
+  const initialData = savedData ? savedData : ExampleSource;
+
+  editorView = createEditor(editorContainer, initialData, executeCode);
+  compile_and_run(editorView.state.doc.toString());
+
+  // 3. Initiate the 5-second auto-save loop
+  setInterval(() => {
+    if (editorView) {
+      const stateJSON = serializeEditorState(editorView);
+      save_basic_code(stateJSON);
+    }
+  }, 5000);
+}
+
+initEditor();
+
+editorContainer.innerHTML = "";
+editorView = createEditor(editorContainer, ExampleSource, executeCode);
+compile_and_run(ExampleSource);
+
+// --- System Keybindings & File Loading ---
+canvas.addEventListener("keydown", (e) => keys_down.add(e.key));
+canvas.addEventListener("keyup", (e) => keys_down.delete(e.key));
+canvas.addEventListener("mousemove", (e) => {
+  if (active_env) {
+    // Get the bounding rectangle of the canvas to offset the screen coordinates
+    const rect = canvas.getBoundingClientRect();
+
+    // Calculate the mouse position relative to the canvas dimensions
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Update the runtime environment variables
+    active_env.assign("MOUSE_X", mouseX);
+    active_env.assign("MOUSE_Y", mouseY);
   }
-};
+});
 
-COMMANDS.NEW = () => {
-  COMMANDS.STOP();
-  programMap.clear();
-  renderEditor(programMap, commandsContainer);
-  ctx.clearRect(0, 0, canvas.width, canvas.height); // Wipe the visual buffer
-  console.log("Environment Cleared.");
-};
+// --- UI Controls ---
+btnRun.addEventListener("click", executeCode);
+btnStop.addEventListener("click", stop_engine);
+btnSave.addEventListener("click", () => {
+  if (!editorView) return;
+  const code = editorView.state.doc.toString();
+  const blob = new Blob([code], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
 
-COMMANDS.LIST = () => {
-  uiOverlay.classList.remove("drawer-closed");
-  setTimeout(() => inputElement.focus(), 50);
-};
+  a.href = url;
+  a.download = "program.basic";
+  document.body.appendChild(a);
+  a.click();
 
-// Initialize the autocomplete handler
-handleAutocompleteNavigation(
-  selectedIndex,
-  currentSuggestions,
-  programMap,
-  errorDisplay,
-  inputForm,
-  commandsContainer,
-  inputElement,
-  autocompleteList,
-  active_env,
-  scopes,
-);
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+inputFile.addEventListener("change", (event) => {
+  const input = event.target as HTMLInputElement;
+  let file: File | null = null;
+  if (input !== null && input.files !== null) {
+    file = input.files[0];
+    if (!file.type.startsWith("text"))
+      errorDisplay.textContent = "File must be a text file";
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    console.log("loaded");
+    const result = reader.result;
+    if (result === null) return;
+    if (typeof result === "string") {
+      editorContainer.innerHTML = "";
+      editorView = createEditor(editorContainer, result, executeCode);
+      compile_and_run(result);
+    }
+  };
+
+  reader.onerror = () => {
+    errorDisplay.textContent = "Failed loading the text file";
+    errorDisplay.style.display = "flex";
+  };
+  reader.onabort = () => {
+    errorDisplay.textContent = "Failed loading the text file";
+    errorDisplay.style.display = "flex";
+  };
+
+  if (file !== null) reader.readAsText(file);
+  else {
+    errorDisplay.textContent = "Failed loading the text file";
+    errorDisplay.style.display = "flex";
+  }
+});
+
+// --- Toggle Editor ---
+let isEditorOpen = true;
+btnToggleEditor.addEventListener("click", () => {
+  isEditorOpen = !isEditorOpen;
+  editorPane.style.display = isEditorOpen ? "flex" : "none";
+  dragDivider.style.display = isEditorOpen ? "block" : "none";
+  btnToggleEditor.textContent = isEditorOpen ? "◀ EDITOR" : "▶ EDITOR";
+  resizeCanvas(); // Trigger paint recalibration
+});
+
+// --- Resizer / Drag Divider ---
+let isDragging = false;
+
+dragDivider.addEventListener("mousedown", () => {
+  isDragging = true;
+  dragDivider.classList.add("dragging");
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  canvasWrapper.style.pointerEvents = "none"; // Stop iframe/canvas from swallowing pointer events
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (!isDragging) return;
+  const workspaceWidth = document.getElementById("workspace")!.clientWidth;
+  const newBasis = (e.clientX / workspaceWidth) * 100;
+  // Constrain the editor pane between 5% and 95% of the screen
+  if (newBasis > 5 && newBasis < 95) {
+    editorPane.style.flex = `0 0 ${newBasis}%`;
+    resizeCanvas();
+  }
+});
+
+window.addEventListener("mouseup", () => {
+  if (isDragging) {
+    isDragging = false;
+    dragDivider.classList.remove("dragging");
+    document.body.style.cursor = "default";
+    document.body.style.userSelect = "";
+    canvasWrapper.style.pointerEvents = "auto";
+  }
+});

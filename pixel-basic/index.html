@@ -8,51 +8,35 @@
   </head>
   <body>
     <div id="app">
-      <!-- Full-screen Canvas Background -->
-      <canvas id="graphics-canvas"></canvas>
-
-      <!-- Overlay UI -->
-      <div id="ui-overlay">
-        <h1>PIXEL BASIC</h1>
-
-        <div id="editor-container">
-          <!-- The fixed viewport list -->
-          <div id="commands-container">
-            <!-- Rendered lines go here dynamically -->
-          </div>
-
-          <!-- Bottom input bar -->
-
-          <div>
-            <!-- New Error Banner -->
-            <div id="error-display" style="display: none"></div>
-
-            <!-- Form Container Wrapper -->
-            <div style="position: relative; width: 100%">
-              <!-- New Autocomplete List -->
-              <ul id="autocomplete-list" style="display: none"></ul>
-
-              <form id="input-form">
-                <input
-                  type="text"
-                  id="input"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                <button id="submit-button" type="submit">ENTER</button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div id="hud">
-        <button id="hud-toggle">EDITOR</button>
-        <div>
-          <label for="file-input">Load File</label>
+      <header id="top-bar">
+        <div class="brand">PIXEL BASIC</div>
+        <div class="controls">
+          <button id="btn-toggle-editor" class="control-btn toggle-btn">
+            ◀ EDITOR
+          </button>
+          <button id="btn-run" class="control-btn play-btn">▶ RUN</button>
+          <button id="btn-stop" class="control-btn stop-btn">🛑 STOP</button>
+          <button id="btn-save" class="control-btn">💾 SAVE FILE</button>
+          <label for="file-input" class="control-btn load-btn">LOAD FILE</label>
           <input type="file" name="file-input" id="file-input" hidden />
         </div>
-      </div>
+      </header>
+
+      <main id="workspace">
+        <section id="editor-pane">
+          <div id="editor-container"></div>
+        </section>
+
+        <!-- Split Pane Resizer -->
+        <div id="drag-divider"></div>
+
+        <section id="canvas-pane">
+          <div id="canvas-wrapper">
+            <canvas id="graphics-canvas"></canvas>
+          </div>
+          <div id="error-display" style="display: none"></div>
+        </section>
+      </main>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

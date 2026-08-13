@@ -3,7 +3,6 @@ REM PIXEL-BASIC: SYSTEMS SIMULATION STRESS TEST
 REM ==========================================
 
 SCREEN 800, 600
-CLEAR_SCREEN
 
 REM 1. Dictionaries & Arrays (Engine State)
 LET engine_state = [

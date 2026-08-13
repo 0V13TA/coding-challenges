@@ -25,6 +25,7 @@ export type Scope = {
 export function define_builtin_functions(
   ctx: CanvasRenderingContext2D,
   keys_down: Set<string>,
+  update_env: (name: string, value: any) => void,
 ): Map<string, Callable> {
   const global_symbols = new Map<string, Callable>();
 
@@ -78,12 +79,11 @@ export function define_builtin_functions(
     arity: 2,
     is_native: true,
     native_fn: (w: number, h: number) => {
-      const offscreen = new OffscreenCanvas(w, h);
-      const off_ctx = offscreen.getContext("2d");
-      if (!off_ctx) return -1;
-      const id = next_buffer_id++;
-      buffers.set(id, off_ctx as OffscreenCanvasRenderingContext2D);
-      if (buffers.has(id)) active_buffer_id = id;
+      ctx.canvas.width = w;
+      ctx.canvas.height = h;
+
+      update_env("SCR_W", w);
+      update_env("SCR_H", h);
     },
   });
 
@@ -329,6 +329,8 @@ export function define_builtin_constants(
   global_env.define("MOUSE_Y", 0);
   global_env.define("SCR_W", scr_wdith);
   global_env.define("SCR_H", scr_height);
+  global_env.define("HOST_W", innerWidth);
+  global_env.define("HOST_H", innerHeight);
 }
 
 export function pass_1_scope_analysis(tokens: Token[], scopes: Scope[]): void {

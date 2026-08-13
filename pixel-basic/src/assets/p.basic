@@ -3,6 +3,7 @@ REM PIXEL-BASIC: ORBITAL BUFFER SIMULATION
 REM ==========================================
 
 REM 1. Initialize Off-Screen Starfield Buffer
+SCREEN HOST_W, HOST_H
 LET bg_buffer = CREATE_BUFFER(SCR_W, SCR_H)
 
 REM Bind to the background buffer
