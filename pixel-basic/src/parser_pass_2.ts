@@ -65,9 +65,7 @@ function get_bp(type: string): number {
   }
 }
 
-// Helper to grab the current token
 function peek(state: ParserState, i: number = 0): Token {
-  // Return the current token, or a safe fallback EOF token if out of bounds
   return (
     state.tokens[state.currentIndex + i] || {
       type: "EOF",
@@ -78,26 +76,20 @@ function peek(state: ParserState, i: number = 0): Token {
   );
 }
 
-// Helper to grab the current token and advance the pointer
 function advance(state: ParserState): Token {
-  const current_token = peek(state); // Use the updated peek to guarantee a valid token object
-
+  const current_token = peek(state);
   if (state.currentIndex < state.tokens.length) {
     state.currentIndex++;
   }
-
   return current_token;
 }
 
-// Helper to assert that the next token is what we expect (e.g., matching THEN after an IF)
 function expect(
   state: ParserState,
   type: TokenType[] | TokenType,
   error_msg: string,
 ): Token | null {
   const current_type = peek(state).type;
-
-  // Ensure we do a strict equality check if it's a single string
   const is_match = Array.isArray(type)
     ? type.includes(current_type)
     : type === current_type;
@@ -115,44 +107,55 @@ function expect(
 }
 
 function nud(state: ParserState, token: Token): ASTNode {
+  const { line, column } = token;
   switch (token.type) {
     case "NUMBER":
-      return { type: "NumericLiteral", value: parseFloat(token.value) };
+      return {
+        type: "NumericLiteral",
+        value: parseFloat(token.value),
+        line,
+        column,
+      };
     case "STRING":
-      return { type: "StringLiteral", value: token.value };
+      return { type: "StringLiteral", value: token.value, line, column };
     case "BOOLEAN":
-      return { type: "BooleanLiteral", value: token.value === "TRUE" };
+      return {
+        type: "BooleanLiteral",
+        value: token.value === "TRUE",
+        line,
+        column,
+      };
     case "ID":
-      return { type: "Identifier", name: token.value };
+      return { type: "Identifier", name: token.value, line, column };
     case "MINUS":
     case "NOT":
+    case "BITWISE":
       return {
         type: "UnaryExpression",
         operator: token.value,
         argument: parse_expression(state, BP.UNARY),
+        line,
+        column,
       };
     case "LPAREN":
       const expr = parse_expression(state, BP.DEFAULT);
       expect(state, "RPAREN", "Expected closing ')' after expression.");
       return expr;
-
-    // Route arrays and dictionaries directly from the Pratt Parser here
     case "LBRACKET":
-      return parse_array_and_dict(state);
-
+      return parse_array_and_dict(state, token);
     default:
       Errors.push({
         message: `Unexpected token in expression: ${token.value}`,
         line: token.line,
         column: token.column,
       });
-      return { type: "NumericLiteral", value: 0 };
+      return { type: "NumericLiteral", value: 0, line, column };
   }
 }
 
 function led(state: ParserState, token: Token, left: ASTNode): ASTNode {
+  const { line, column } = token;
   switch (token.type) {
-    // --- Binary Math & Logic ---
     case "PLUS":
     case "MINUS":
     case "MULTIPLY":
@@ -170,38 +173,35 @@ function led(state: ParserState, token: Token, left: ASTNode): ASTNode {
         type: "BinaryExpression",
         operator: token.value,
         left: left,
-        // Notice we pass the binding power of the CURRENT operator into the right side
         right: parse_expression(state, get_bp(token.type)),
+        line,
+        column,
       };
-
-    // --- Function Calls ---
     case "LPAREN":
       const args: ASTNode[] = [];
-      // If the next token isn't a closing paren, we have arguments to parse
       if (peek(state).type !== "RPAREN") {
         do {
           args.push(parse_expression(state, BP.DEFAULT));
-        } while (peek(state).type === "COMMA" && advance(state)); // Consume commas
+        } while (peek(state).type === "COMMA" && advance(state));
       }
       expect(state, "RPAREN", "Expected ')' after function arguments.");
-
       return {
         type: "FunctionCall",
         caller: (left as Identifier).name,
         args,
+        line,
+        column,
       };
-
-    // --- Array/Dictionary Indexing ---
     case "LBRACKET":
       const index = parse_expression(state, BP.DEFAULT);
       expect(state, "RBRACKET", "Expected ']' after index.");
-
       return {
         type: "IndexExpression",
         object: left,
         index: index,
+        line,
+        column,
       };
-
     default:
       return left;
   }
@@ -218,7 +218,6 @@ export function parse_program(tokens: Token[], scopes: Scope[]): Program {
   const body: ASTNode[] = [];
 
   while (state.currentIndex < state.tokens.length) {
-    // Skip stray newlines between statements
     if (peek(state).type === "NEWLINE") {
       advance(state);
       continue;
@@ -228,24 +227,20 @@ export function parse_program(tokens: Token[], scopes: Scope[]): Program {
     if (statement) {
       body.push(statement);
     } else {
-      // If parse_statement returns null (error recovery), just advance to prevent infinite loop
       advance(state);
     }
   }
 
-  return { type: "Program", body };
+  return { type: "Program", body, line: 1, column: 1 };
 }
 
 export function parse_expression(
   state: ParserState,
   current_bp: number,
 ): ASTNode {
-  // 1. Grab the very first token and parse it as a prefix (Null Denotation)
   let token = advance(state);
   let left = nud(state, token);
 
-  // 2. Keep looping as long as the NEXT token's binding power is higher
-  //    than the binding power of the expression we are currently evaluating.
   while (state.currentIndex < state.tokens.length) {
     const next_token = peek(state);
     const next_bp = get_bp(next_token.type);
@@ -254,7 +249,6 @@ export function parse_expression(
       break;
     }
 
-    // 3. The next operator binds tighter! Consume it and parse it as an infix (Left Denotation)
     token = advance(state);
     left = led(state, token, left);
   }
@@ -298,7 +292,6 @@ function parse_statement(state: ParserState): ASTNode | null {
 function parse_declaration(state: ParserState): VariableDeclaration | null {
   const keyword = advance(state);
   const is_constant = keyword.type === "CONST";
-
   const id_token = expect(
     state,
     "ID",
@@ -320,19 +313,18 @@ function parse_declaration(state: ParserState): VariableDeclaration | null {
     is_constant,
     target: id_token.value,
     value: expression_value,
+    line: keyword.line,
+    column: keyword.column,
   };
 }
 
 function parse_array_and_dict(
   state: ParserState,
+  open_token: Token,
 ): ArrayLiteral | DictionaryLiteral {
-  // We do NOT call advance(state) to consume '[' here because
-  // nud() already advanced past it before calling this function.
-
   let is_dictionary = false;
   let lookahead_index = 0;
 
-  // Lookahead: Safely skip over any newlines to see if the first element is an ID followed by an '='
   while (peek(state, lookahead_index).type === "NEWLINE") {
     lookahead_index++;
   }
@@ -346,7 +338,6 @@ function parse_array_and_dict(
 
   if (is_dictionary) {
     const properties: { key: string; value: ASTNode }[] = [];
-
     while (
       state.currentIndex < state.tokens.length &&
       peek(state).type !== "RBRACKET"
@@ -355,7 +346,6 @@ function parse_array_and_dict(
         advance(state);
         continue;
       }
-
       const key_token = expect(
         state,
         "ID",
@@ -364,10 +354,8 @@ function parse_array_and_dict(
       if (!key_token) break;
 
       expect(state, "DECLARATION", "Expected '=' after dictionary key.");
-
       const value = parse_expression(state, BP.DEFAULT);
 
-      // Duplicate Key Check
       if (properties.some((p) => p.key === key_token.value)) {
         Errors.push({
           message: `Key '${key_token.value}' already exists in dictionary.`,
@@ -378,9 +366,13 @@ function parse_array_and_dict(
         properties.push({ key: key_token.value, value });
       }
     }
-
     expect(state, "RBRACKET", "Expected ']' to close dictionary.");
-    return { type: "DictionaryLiteral", properties };
+    return {
+      type: "DictionaryLiteral",
+      properties,
+      line: open_token.line,
+      column: open_token.column,
+    };
   } else {
     const elements: ASTNode[] = [];
     while (
@@ -393,16 +385,18 @@ function parse_array_and_dict(
       }
       elements.push(parse_expression(state, BP.DEFAULT));
     }
-
     expect(state, "RBRACKET", "Expected ']' to close array.");
-    return { type: "ArrayLiteral", elements };
+    return {
+      type: "ArrayLiteral",
+      elements,
+      line: open_token.line,
+      column: open_token.column,
+    };
   }
 }
 
 function parse_while(state: ParserState): WhileStatement | null {
-  advance(state); // Consume 'WHILE'
-
-  // Parse the condition expression (e.g., accumulator < 20)
+  const startToken = advance(state); // Consume 'WHILE'
   const condition = parse_expression(state, 0);
 
   if (!expect(state, "THEN", "Expected 'THEN' after WHILE condition."))
@@ -410,7 +404,6 @@ function parse_while(state: ParserState): WhileStatement | null {
 
   const body: ASTNode[] = [];
 
-  // Consume statements until we hit an END token
   while (
     state.currentIndex < state.tokens.length &&
     peek(state).type !== "END"
@@ -423,7 +416,6 @@ function parse_while(state: ParserState): WhileStatement | null {
     if (stmt) body.push(stmt);
   }
 
-  // Ensure we found the END keyword and that it's followed by WHILE
   if (!expect(state, "END", "Expected 'END' to close WHILE block."))
     return null;
   if (!expect(state, "WHILE", "Expected 'WHILE' after END.")) return null;
@@ -432,12 +424,13 @@ function parse_while(state: ParserState): WhileStatement | null {
     type: "WhileStatement",
     condition,
     body,
+    line: startToken.line,
+    column: startToken.column,
   };
 }
 
 function parse_if(state: ParserState): IfStatement | null {
-  advance(state); // Consume 'IF'
-
+  const startToken = advance(state); // Consume 'IF'
   const condition = parse_expression(state, 0);
 
   if (!expect(state, "THEN", "Expected 'THEN' after IF condition."))
@@ -449,17 +442,16 @@ function parse_if(state: ParserState): IfStatement | null {
   if (peek(state).type !== "NEWLINE") {
     const stmt = parse_statement(state);
     if (stmt) body.push(stmt);
-
-    // Return early without expecting an END IF
     return {
       type: "IfStatement",
       condition,
       body,
       alternate,
+      line: startToken.line,
+      column: startToken.column,
     };
   }
 
-  // Consume the main body
   while (
     state.currentIndex < state.tokens.length &&
     peek(state).type !== "ELSE" &&
@@ -473,18 +465,14 @@ function parse_if(state: ParserState): IfStatement | null {
     if (stmt) body.push(stmt);
   }
 
-  // Check for an ELSE or ELSE IF block
   if (peek(state).type === "ELSE") {
     advance(state); // Consume 'ELSE'
-
     if (peek(state).type === "IF") {
-      // Recursively parse the 'ELSE IF' branch
       const nested_if = parse_if(state);
       if (nested_if && nested_if.type === "IfStatement") {
         alternate = nested_if;
       }
     } else {
-      // Parse a standard 'ELSE' body
       const elseBody: ASTNode[] = [];
       while (
         state.currentIndex < state.tokens.length &&
@@ -501,9 +489,6 @@ function parse_if(state: ParserState): IfStatement | null {
     }
   }
 
-  // If this was the top-level IF (not an internal ELSE IF), we expect an END IF
-  // We only consume END IF if the current token is END, because a nested parse_if
-  // might have already consumed it.
   if (peek(state).type === "END") {
     advance(state); // Consume 'END'
     expect(state, "IF", "Expected 'IF' after END.");
@@ -514,18 +499,19 @@ function parse_if(state: ParserState): IfStatement | null {
     condition,
     body,
     alternate,
+    line: startToken.line,
+    column: startToken.column,
   };
 }
 
 function parse_subroutine(state: ParserState): SubDeclaration | null {
-  advance(state); // Consume 'SUB'
+  const startToken = advance(state); // Consume 'SUB'
 
   const name_token = expect(state, "ID", "Expected subroutine name.");
   if (!name_token) return null;
 
   const parameters: string[] = [];
 
-  // Parse arguments until we hit THEN
   while (peek(state).type !== "THEN") {
     if (peek(state).type === "COMMA") {
       advance(state);
@@ -539,7 +525,6 @@ function parse_subroutine(state: ParserState): SubDeclaration | null {
 
   const body: ASTNode[] = [];
 
-  // Parse the function body
   while (
     state.currentIndex < state.tokens.length &&
     peek(state).type !== "END"
@@ -560,19 +545,18 @@ function parse_subroutine(state: ParserState): SubDeclaration | null {
     name: name_token.value,
     parameters,
     body,
+    line: startToken.line,
+    column: startToken.column,
   };
 }
 
 function parse_assignment_or_call(
   state: ParserState,
 ): Assignment | FunctionCall | null {
-  // We use the Pratt parser to resolve the left side.
-  // It will return an Identifier or an IndexExpression (e.g., array[0])
+  const startToken = peek(state);
   const target = parse_expression(state, BP.ASSIGN);
-
   const next_token = peek(state);
 
-  // If the expression is followed by an assignment operator, it's an Assignment
   if (
     next_token.type === "DECLARATION" ||
     next_token.type === "ADD_DECLARE" ||
@@ -583,27 +567,22 @@ function parse_assignment_or_call(
   ) {
     const operator = advance(state); // Consume the assignment operator
     const value = parse_expression(state, 0);
-
     return {
       type: "Assignment",
       operator: operator.value,
       target,
       value,
+      line: startToken.line,
+      column: startToken.column,
     };
   }
 
-  // If it wasn't an assignment, and the expression was a FunctionCall node
-  // generated by the Pratt parser, then it's a standalone function execution.
   if (target.type === "FunctionCall") {
-    return target; // We just return the Pratt node directly
+    return target;
   }
 
-  // If it's a standalone ID without parens (e.g., `nice_function "hello"`),
-  // we need to construct a FunctionCall manually.
   if (target.type === "Identifier") {
     const args: ASTNode[] = [];
-
-    // Parse arguments until we hit a newline or another statement boundary
     while (
       state.currentIndex < state.tokens.length &&
       peek(state).type !== "NEWLINE" &&
@@ -612,11 +591,12 @@ function parse_assignment_or_call(
       args.push(parse_expression(state, 0));
       if (peek(state).type === "COMMA") advance(state);
     }
-
     return {
       type: "FunctionCall",
       caller: target.name,
       args,
+      line: startToken.line,
+      column: startToken.column,
     };
   }
 
@@ -626,34 +606,35 @@ function parse_assignment_or_call(
     line: peek(state).line,
     column: peek(state).column,
   });
+
   return null;
 }
 
 function parse_break(state: ParserState): BreakStatement | null {
-  advance(state); // Consume 'BREAK'
-  return { type: "BreakStatement" };
+  const t = advance(state);
+  return { type: "BreakStatement", line: t.line, column: t.column };
 }
 
 function parse_continue(state: ParserState): ContinueStatement | null {
-  advance(state); // Consume 'CONTINUE'
-  return { type: "ContinueStatement" };
+  const t = advance(state);
+  return { type: "ContinueStatement", line: t.line, column: t.column };
 }
 
 function parse_return(state: ParserState): ReturnStatement | null {
-  advance(state); // Consume 'RETURN'
-
+  const t = advance(state);
   let argument: ASTNode | undefined = undefined;
-  // If the next token isn't a statement terminator, parse the return value
+
   if (peek(state).type !== "NEWLINE" && peek(state).type !== "END") {
     argument = parse_expression(state, 0);
   }
 
-  return { type: "ReturnStatement", argument };
+  return { type: "ReturnStatement", argument, line: t.line, column: t.column };
 }
 
 function parse_switch(state: ParserState): SwitchStatement | null {
-  advance(state); // Consume 'SWITCH'
+  const startToken = advance(state); // Consume 'SWITCH'
   const discriminant = parse_expression(state, 0);
+
   if (!expect(state, "THEN", "Expected 'THEN' after SWITCH condition."))
     return null;
 
@@ -687,10 +668,9 @@ function parse_switch(state: ParserState): SwitchStatement | null {
         const stmt = parse_statement(state);
         if (stmt) body.push(stmt);
       }
-
-      // Handle the 'END CASE' block termination seen in practice.basic
       expect(state, "END", "Expected 'END' to close CASE block.");
       expect(state, "CASE", "Expected 'CASE' after END.");
+
       cases.push({ value, body });
     } else if (peek(state).type === "DEFAULT") {
       advance(state);
@@ -705,9 +685,9 @@ function parse_switch(state: ParserState): SwitchStatement | null {
         const stmt = parse_statement(state);
         if (stmt) body.push(stmt);
       }
-
       expect(state, "END", "Expected 'END' to close DEFAULT block.");
       expect(state, "DEFAULT", "Expected 'DEFAULT' after END.");
+
       default_case = body;
     } else {
       Errors.push({
@@ -722,5 +702,12 @@ function parse_switch(state: ParserState): SwitchStatement | null {
   expect(state, "END", "Expected 'END' to close SWITCH block.");
   expect(state, "SWITCH", "Expected 'SWITCH' after END.");
 
-  return { type: "SwitchStatement", discriminant, cases, default_case };
+  return {
+    type: "SwitchStatement",
+    discriminant,
+    cases,
+    default_case,
+    line: startToken.line,
+    column: startToken.column,
+  };
 }

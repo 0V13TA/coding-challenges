@@ -5,14 +5,12 @@ import {
   type RuntimeResult,
 } from "./runtime";
 
-// Define what a control flow signal looks like
 export type ControlFlowSignal = {
   type: "ControlFlow";
   action: "BREAK" | "CONTINUE" | "RETURN";
-  value?: any; // Only used to pass data back from a RETURN
+  value?: any;
 };
 
-// Type guard to easily check if a returned value is a signal
 function is_control_flow(val: any): val is ControlFlowSignal {
   return val !== null && typeof val === "object" && val.type === "ControlFlow";
 }
@@ -34,7 +32,6 @@ export function* evaluate_program(
   env: Environment,
 ): Generator<RuntimeResult, any, any> {
   switch (node.type) {
-    // --- Literals ---
     case "NumericLiteral":
     case "StringLiteral":
     case "BooleanLiteral":
@@ -43,15 +40,18 @@ export function* evaluate_program(
     case "Identifier": {
       const value = env.get(node.name);
       if (value === null)
-        yield { status: "error", message: `Undefined variable: ${node.name}` };
+        yield {
+          status: "error",
+          message: `Undefined variable: ${node.name}`,
+          line: node.line,
+          column: node.column,
+        };
       return value;
     }
 
-    // --- Expressions ---
     case "BinaryExpression": {
       const left = yield* evaluate_program(node.left, env);
       const right = yield* evaluate_program(node.right, env);
-
       switch (node.operator) {
         case "+":
           return left + right;
@@ -85,12 +85,13 @@ export function* evaluate_program(
           yield {
             status: "error",
             message: `Unknown operator: '${node.operator}'`,
+            line: node.line,
+            column: node.column,
           };
       }
       return null;
     }
 
-    // --- Variable Declarations ---
     case "VariableDeclaration": {
       const declared_value = yield* evaluate_program(node.value, env);
       env.define(node.target, declared_value);
@@ -100,20 +101,17 @@ export function* evaluate_program(
     case "Assignment": {
       if (node.target.type === "Identifier") {
         let assigned_value = yield* evaluate_program(node.value, env);
-
-        // --- Handle compound assignment operators (e.g., +=, -=, etc.) ---
         const current_value = env.get(node.target.name);
+
         switch (node.operator) {
           case "+=": {
             if (current_value !== null)
               assigned_value = current_value + assigned_value;
-
             break;
           }
           case "-=": {
             if (current_value !== null)
               assigned_value = current_value - assigned_value;
-
             break;
           }
           case "*=": {
@@ -132,32 +130,35 @@ export function* evaluate_program(
             break;
           }
         }
+
         const success = env.assign(node.target.name, assigned_value);
         if (!success) {
           yield {
             status: "error",
             message: `Cannot assign to undefined variable: ${node.target.name}`,
+            line: node.line,
+            column: node.column,
           };
         }
       } else if (node.target.type === "IndexExpression") {
-        // 1. Evaluate the value being assigned
         let assigned_value = yield* evaluate_program(node.value, env);
-
-        // 2. Evaluate the object (the array or dictionary)
         const target_object = yield* evaluate_program(node.target.object, env);
 
         if (
           !target_object ||
           (typeof target_object !== "object" && !Array.isArray(target_object))
         ) {
-          yield { status: "error", message: `Cannot index into a non-object.` };
+          yield {
+            status: "error",
+            message: `Cannot index into a non-object.`,
+            line: node.line,
+            column: node.column,
+          };
           return null;
         }
 
-        // 3. Evaluate the index/key
         const index_value = yield* evaluate_program(node.target.index, env);
 
-        // 4. Handle compound operators for array/dict elements
         switch (node.operator) {
           case "+=":
             assigned_value = target_object[index_value] + assigned_value;
@@ -176,7 +177,6 @@ export function* evaluate_program(
             break;
         }
 
-        // 5. Apply the mutation
         target_object[index_value] = assigned_value;
       }
       return null;
@@ -187,20 +187,25 @@ export function* evaluate_program(
       const index_value = yield* evaluate_program(node.index, env);
 
       if (!target_object) {
-        yield { status: "error", message: "Cannot read index of undefined." };
-        return null;
-      }
-
-      const result = target_object[index_value];
-
-      if (result === undefined) {
         yield {
           status: "error",
-          message: `Index '${index_value}' out of bounds or missing.`,
+          message: "Cannot read index of undefined.",
+          line: node.line,
+          column: node.column,
         };
         return null;
       }
 
+      const result = target_object[index_value];
+      if (result === undefined) {
+        yield {
+          status: "error",
+          message: `Index '${index_value}' out of bounds or missing.`,
+          line: node.line,
+          column: node.column,
+        };
+        return null;
+      }
       return result;
     }
 
@@ -227,7 +232,6 @@ export function* evaluate_program(
       return { type: "ControlFlow", action: "CONTINUE" };
 
     case "ReturnStatement": {
-      // Evaluate the expression to the right of RETURN, if it exists
       const return_value = node.argument
         ? yield* evaluate_program(node.argument, env)
         : null;
@@ -236,7 +240,6 @@ export function* evaluate_program(
 
     case "IfStatement": {
       const condition_value = yield* evaluate_program(node.condition, env);
-
       if (condition_value) {
         for (const stmt of node.body) {
           const result = yield* evaluate_program(stmt, env);
@@ -255,7 +258,6 @@ export function* evaluate_program(
           }
         }
       }
-
       return null;
     }
 
@@ -277,20 +279,20 @@ export function* evaluate_program(
             }
           }
         }
-
         if (break_loop) break;
-        yield { status: "running" }; // Yield control back to the caller after each iteration
+        yield { status: "running" };
       }
       return null;
     }
 
-    // --- Functions ---
     case "FunctionCall": {
       const func_entry = env.functionMap.get(node.caller);
       if (!func_entry) {
         yield {
           status: "error",
           message: `Undefined function: ${node.caller}`,
+          line: node.line,
+          column: node.column,
         };
         return null;
       }
@@ -306,6 +308,8 @@ export function* evaluate_program(
         yield {
           status: "error",
           message: `Function ${node.caller} expects ${func_entry.arity} arguments, but got ${evaluated_args.length}.`,
+          line: node.line,
+          column: node.column,
         };
         return null;
       }
@@ -314,16 +318,13 @@ export function* evaluate_program(
         return func_entry.native_fn(...evaluated_args);
       else if (func_entry.declaration) {
         const sub_env = create_environment(env, env.functionMap);
-
         func_entry.declaration.parameters.forEach((param_name, idx) =>
           sub_env.define(param_name, evaluated_args[idx]),
         );
 
         let final_return_value = null;
-
         for (const stmt of func_entry.declaration.body) {
           const result = yield* evaluate_program(stmt, sub_env);
-
           if (is_control_flow(result) && result.action === "RETURN") {
             final_return_value = result.value;
             break;
@@ -334,20 +335,17 @@ export function* evaluate_program(
       return null;
     }
 
-    // --- Subroutines ---
     case "SubDeclaration": {
-      // Subroutines are hoisted before execution begins, so we safely skip them here.
       return null;
     }
 
-    // --- Switch Statements ---
     case "SwitchStatement": {
       const discriminant_value = yield* evaluate_program(
         node.discriminant,
         env,
       );
-      let matched = false;
 
+      let matched = false;
       for (const case_node of node.cases) {
         const case_value = yield* evaluate_program(case_node.value, env);
         if (discriminant_value === case_value) {
@@ -356,7 +354,7 @@ export function* evaluate_program(
             const result = yield* evaluate_program(stmt, env);
             if (is_control_flow(result)) return result;
           }
-          break; // Exit switch after a matched case
+          break;
         }
       }
 
@@ -369,7 +367,6 @@ export function* evaluate_program(
       return null;
     }
 
-    // --- Unary Expressions ---
     case "UnaryExpression": {
       const arg_value = yield* evaluate_program(node.argument, env);
       switch (node.operator) {
@@ -383,6 +380,8 @@ export function* evaluate_program(
           yield {
             status: "error",
             message: `Unknown unary operator: '${node.operator}'`,
+            line: node.line,
+            column: node.column,
           };
       }
       return null;

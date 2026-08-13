@@ -12,7 +12,7 @@ export type Environment = {
 export type RuntimeResult =
   | { status: "running" }
   | { status: "done"; value?: any }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; line?: number; column?: number };
 
 export type Callable = {
   arity: number;

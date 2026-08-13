@@ -1,0 +1,133 @@
+REM ==========================================
+REM PIXEL-BASIC: KINEMATIC DRIFTER SIMULATION
+REM ==========================================
+SCREEN HOST_W, HOST_H
+CLEAR_SCREEN
+
+REM 1. Initial State Setup
+LET ship_x = SCR_W / 2
+LET ship_y = SCR_H / 2
+LET vel_x = 0
+LET vel_y = 0
+
+LET state = [
+  running = TRUE,
+  score = 0,
+  target_x = RND(100, SCR_W - 100),
+  target_y = RND(100, SCR_H - 100),
+  time = 0
+]
+
+REM 2. Utility Subroutines
+SUB get_distance x1, y1, x2, y2 THEN
+  LET dx = x2 - x1
+  LET dy = y2 - y1
+  RETURN SQRT((dx * dx) + (dy * dy))
+END SUB
+
+PRINT "Initializing kinematic drift simulation..."
+
+REM 3. Main Engine Loop
+WHILE state["running"] == TRUE THEN
+  REM Wipe the frame clean with a muted dark background
+  FILL_COLOR 17, 17, 27
+  DRAW_RECT 0, 0, SCR_W, SCR_H
+  
+  state["time"] += 0.05
+
+  REM --- PHYSICS & KINEMATICS ---
+  LET dx = MOUSE_X - ship_x
+  LET dy = MOUSE_Y - ship_y
+  LET dist = get_distance(ship_x, ship_y, MOUSE_X, MOUSE_Y)
+  LET heading = ATAN2(dy, dx)
+
+  REM Smooth acceleration towards the pointer
+  IF dist > 10 THEN
+    vel_x = LERP(vel_x, COS(heading) * 12, 0.06)
+    vel_y = LERP(vel_y, SIN(heading) * 12, 0.06)
+  ELSE
+    REM Friction decel when near the target
+    vel_x = LERP(vel_x, 0, 0.15)
+    vel_y = LERP(vel_y, 0, 0.15)
+  END IF
+
+  ship_x += vel_x
+  ship_y += vel_y
+
+  REM Screen wrapping for a continuous environment
+  IF ship_x < 0 THEN ship_x = SCR_W
+  IF ship_x > SCR_W THEN ship_x = 0
+  IF ship_y < 0 THEN ship_y = SCR_H
+  IF ship_y > SCR_H THEN ship_y = 0
+
+  REM --- TARGET LOGIC ---
+  LET target_dist = get_distance(ship_x, ship_y, state["target_x"], state["target_y"])
+
+  REM Collision detection
+  IF target_dist < 35 THEN
+    state["score"] += 1
+    state["target_x"] = RND(100, SCR_W - 100)
+    state["target_y"] = RND(100, SCR_H - 100)
+  END IF
+
+  REM --- ANOMALY RENDERING ---
+  LET pulse_radius = 20 + (SIN(state["time"] * 2) * 5)
+  
+  REM Rotating containment ring
+  PUSH_MATRIX
+  TRANSLATE state["target_x"], state["target_y"]
+  ROTATE state["time"] * 1.5
+  NO_FILL
+  STROKE_COLOR 243, 139, 168
+  STROKE_WEIGHT 2
+  DRAW_RECT -25, -25, 50, 50
+  POP_MATRIX
+
+  REM Core pulse
+  FILL_COLOR 243, 139, 168
+  NO_STROKE
+  DRAW_CIRCLE state["target_x"], state["target_y"], pulse_radius
+
+  REM --- SHIP RENDERING ---
+  PUSH_MATRIX
+  TRANSLATE ship_x, ship_y
+  ROTATE heading
+  
+  REM Dynamic Engine Exhaust (Scales with cursor distance)
+  IF dist > 15 THEN
+    LET exhaust_len = CLAMP(dist * 0.15, 5, 25)
+    FILL_COLOR 249, 226, 175
+    NO_STROKE
+    DRAW_TRIANGLE -15, 6, -15, -6, -15 - exhaust_len, 0
+  END IF
+  
+  FILL_COLOR 137, 180, 250
+  STROKE_COLOR 203, 166, 247
+  STROKE_WEIGHT 2
+  
+  REM A sharp, minimalist dual-polygon ship design
+  DRAW_TRIANGLE 25, 0, -15, 18, -8, 0
+  DRAW_TRIANGLE 25, 0, -8, 0, -15, -18
+
+  POP_MATRIX
+
+  REM --- HEADS UP DISPLAY (HUD) ---
+  REM Score Backdrop Box
+  FILL_COLOR 24, 24, 37
+  STROKE_COLOR 203, 166, 247
+  STROKE_WEIGHT 2
+  DRAW_RECT 20, 20, 160, 45
+  
+  REM Live Counter Text
+  SET_FONT 18, "monospace"
+  TEXT_ALIGN "left"
+  FILL_COLOR 205, 214, 244
+  NO_STROKE
+  DRAW_TEXT 35, 48, "SCORE: " + state["score"]
+
+  REM Exit hook
+  IF IS_KEY_DOWN("Escape") THEN
+    state["running"] = FALSE
+    PRINT "Simulation Halted."
+  END IF
+END WHILE

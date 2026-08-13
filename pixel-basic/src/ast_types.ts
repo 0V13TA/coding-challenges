@@ -1,59 +1,90 @@
 // --- Literals (The raw data) ---
-export type NumericLiteral = { type: "NumericLiteral"; value: number };
-export type StringLiteral = { type: "StringLiteral"; value: string };
-export type BooleanLiteral = { type: "BooleanLiteral"; value: boolean };
-export type Identifier = { type: "Identifier"; name: string };
+export type NumericLiteral = {
+  type: "NumericLiteral";
+  value: number;
+  line: number;
+  column: number;
+};
+export type StringLiteral = {
+  type: "StringLiteral";
+  value: string;
+  line: number;
+  column: number;
+};
+export type BooleanLiteral = {
+  type: "BooleanLiteral";
+  value: boolean;
+  line: number;
+  column: number;
+};
+export type Identifier = {
+  type: "Identifier";
+  name: string;
+  line: number;
+  column: number;
+};
 
 // --- Data Structures ---
 export type ArrayLiteral = {
   type: "ArrayLiteral";
   elements: ASTNode[];
+  line: number;
+  column: number;
 };
 export type DictionaryLiteral = {
   type: "DictionaryLiteral";
-  // Stores key-value pairs (e.g., fly = "To move above groud")
   properties: { key: string; value: ASTNode }[];
+  line: number;
+  column: number;
 };
 
 // --- Operations & Access ---
 export type UnaryExpression = {
   type: "UnaryExpression";
-  operator: string; // e.g., "-", "NOT", "~"
+  operator: string;
   argument: ASTNode;
+  line: number;
+  column: number;
 };
-
 export type BinaryExpression = {
   type: "BinaryExpression";
-  operator: string; // e.g., "+", "<", "==", "AND"
+  operator: string;
   left: ASTNode;
   right: ASTNode;
+  line: number;
+  column: number;
 };
-
 export type IndexExpression = {
   type: "IndexExpression";
-  object: ASTNode; // The array or dictionary (e.g., `scores`)
-  index: ASTNode; // The lookup value (e.g., `0` or `i`)
+  object: ASTNode;
+  index: ASTNode;
+  line: number;
+  column: number;
 };
-
 export type FunctionCall = {
   type: "FunctionCall";
   caller: string;
   args: ASTNode[];
+  line: number;
+  column: number;
 };
 
 // --- Variables & Memory ---
 export type VariableDeclaration = {
   type: "VariableDeclaration";
-  is_constant: boolean; // True if CONST, False if LET
+  is_constant: boolean;
   target: string;
   value: ASTNode;
+  line: number;
+  column: number;
 };
-
 export type Assignment = {
   type: "Assignment";
-  operator: string; // "=", "+=", "-=", etc.
-  target: ASTNode; // Could be an Identifier or an IndexExpression (e.g., scores[0] = 50)
+  operator: string;
+  target: ASTNode;
   value: ASTNode;
+  line: number;
+  column: number;
 };
 
 // --- Control Flow ---
@@ -61,25 +92,41 @@ export type IfStatement = {
   type: "IfStatement";
   condition: ASTNode;
   body: ASTNode[];
-  alternate?: ASTNode[] | IfStatement; // Handles ELSE and ELSE IF
+  alternate?: ASTNode[] | IfStatement;
+  line: number;
+  column: number;
 };
-
 export type WhileStatement = {
   type: "WhileStatement";
   condition: ASTNode;
   body: ASTNode[];
+  line: number;
+  column: number;
 };
-
 export type SwitchStatement = {
   type: "SwitchStatement";
   discriminant: ASTNode;
   cases: { value: ASTNode; body: ASTNode[] }[];
   default_case?: ASTNode[];
+  line: number;
+  column: number;
 };
-
-export type BreakStatement = { type: "BreakStatement" };
-export type ContinueStatement = { type: "ContinueStatement" };
-export type ReturnStatement = { type: "ReturnStatement"; argument?: ASTNode };
+export type BreakStatement = {
+  type: "BreakStatement";
+  line: number;
+  column: number;
+};
+export type ContinueStatement = {
+  type: "ContinueStatement";
+  line: number;
+  column: number;
+};
+export type ReturnStatement = {
+  type: "ReturnStatement";
+  argument?: ASTNode;
+  line: number;
+  column: number;
+};
 
 // --- Functions & Subroutines ---
 export type SubDeclaration = {
@@ -87,6 +134,8 @@ export type SubDeclaration = {
   name: string;
   parameters: string[];
   body: ASTNode[];
+  line: number;
+  column: number;
 };
 
 export type ASTNode =
@@ -114,4 +163,6 @@ export type ASTNode =
 export type Program = {
   type: "Program";
   body: ASTNode[];
+  line: number;
+  column: number;
 };

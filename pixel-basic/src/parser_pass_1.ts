@@ -26,6 +26,7 @@ export function define_builtin_functions(
   ctx: CanvasRenderingContext2D,
   keys_down: Set<string>,
   update_env: (name: string, value: any) => void,
+  imageAssets: Map<string, HTMLImageElement>,
 ): Map<string, Callable> {
   const global_symbols = new Map<string, Callable>();
 
@@ -217,6 +218,45 @@ export function define_builtin_functions(
       c.closePath();
       if (do_fill) c.fill();
       if (do_stroke) c.stroke();
+    },
+  });
+
+  global_symbols.set("DRAW_IMAGE", {
+    arity: 5,
+    is_native: true,
+    native_fn: (name: string, x: number, y: number, w: number, h: number) => {
+      const c = get_ctx();
+      const img = imageAssets.get(name);
+      if (img) c.drawImage(img, x, y, w, h);
+    },
+  });
+
+  global_symbols.set("SET_FONT", {
+    arity: 2,
+    is_native: true,
+    native_fn: (size: number, font_name: string) => {
+      const c = get_ctx();
+      // Wraps font_name in quotes so fonts with spaces evaluate safely
+      c.font = `${size}px "${font_name}", monospace`;
+    },
+  });
+
+  global_symbols.set("TEXT_ALIGN", {
+    arity: 1,
+    is_native: true,
+    native_fn: (align: string) => {
+      const c = get_ctx();
+      c.textAlign = align as CanvasTextAlign;
+    },
+  });
+
+  global_symbols.set("DRAW_TEXT", {
+    arity: 3,
+    is_native: true,
+    native_fn: (x: number, y: number, text: string) => {
+      const c = get_ctx();
+      if (do_fill) c.fillText(text, x, y);
+      if (do_stroke) c.strokeText(text, x, y);
     },
   });
 

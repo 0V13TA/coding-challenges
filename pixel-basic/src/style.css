@@ -173,6 +173,90 @@ body {
   background: var(--bg-panel);
 }
 
+/* --- Modals --- */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--bg-panel);
+  border: var(--ui-border);
+  width: 450px;
+  max-width: 90vw;
+  box-shadow: var(--ui-shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: var(--bg-header);
+  border-bottom: var(--ui-border);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-accent);
+  letter-spacing: 2px;
+}
+
+.modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#asset-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#asset-list::-webkit-scrollbar {
+  width: 4px;
+}
+#asset-list::-webkit-scrollbar-thumb {
+  background: var(--text-accent);
+}
+
+#asset-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.9rem;
+}
+
+.delete-asset-btn {
+  background: transparent;
+  color: #f38ba8;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 4px 8px;
+  transition: transform 0.1s;
+}
+
+.delete-asset-btn:hover {
+  transform: scale(1.1);
+}
+
 /* --- Responsive Adjustments --- */
 @media (max-width: 768px) {
   #workspace {

@@ -5,6 +5,7 @@ import { evaluate_program, hoist_program } from "./evaluator";
 import {
   define_builtin_constants,
   define_builtin_functions,
+  Errors,
   pass_1_scope_analysis,
   type Scope,
   type SymbolEntry,
@@ -13,7 +14,12 @@ import { parse_program } from "./parser_pass_2";
 import { create_environment, type Environment } from "./runtime";
 import "./style.css";
 import { tokenize } from "./tokenizer";
-import { load_basic_code, save_basic_code } from "./serialize";
+import {
+  delete_asset,
+  load_basic_code,
+  save_asset,
+  save_basic_code,
+} from "./serialize";
 
 const canvas = document.getElementById("graphics-canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -34,11 +40,23 @@ const inputFile = document.getElementById("file-input") as HTMLInputElement;
 const btnRun = document.getElementById("btn-run") as HTMLButtonElement;
 const btnStop = document.getElementById("btn-stop") as HTMLButtonElement;
 const btnSave = document.getElementById("btn-save") as HTMLButtonElement;
+const btnAssets = document.getElementById("btn-assets") as HTMLButtonElement;
+
+const assetModal = document.getElementById("asset-modal") as HTMLElement;
+const btnCloseAssets = document.getElementById(
+  "btn-close-assets",
+) as HTMLButtonElement;
+const assetInput = document.getElementById("asset-input") as HTMLInputElement;
+const assetList = document.getElementById("asset-list") as HTMLUListElement;
 
 let editorView: EditorView | null = null;
 let animation_frame_id: number | null = null;
 let active_env: Environment | null = null;
 const keys_down = new Set<string>();
+
+// --- Memory Registry ---
+export const imageAssets = new Map<string, HTMLImageElement>();
+let allAssets: any[] = [];
 
 // --- Execution Pipeline ---
 function stop_engine() {
@@ -63,7 +81,7 @@ function compile_and_run(source_code: string) {
 
   active_env = create_environment(
     null,
-    define_builtin_functions(ctx, keys_down, update_env),
+    define_builtin_functions(ctx, keys_down, update_env, imageAssets),
   );
   define_builtin_constants(active_env, canvas.width, canvas.height);
   active_env.assign("SCR_W", canvas.width);
@@ -79,16 +97,31 @@ function compile_and_run(source_code: string) {
     },
   ];
 
+  // 1. Wipe old parse records
+  Errors.length = 0;
   const { tokens, errors: lexErrors } = tokenize(source_code);
 
   if (lexErrors && lexErrors.length > 0) {
-    errorDisplay.textContent = lexErrors[0].message;
+    errorDisplay.textContent = `[Line ${lexErrors[0].line}] ${lexErrors[0].message}`;
     errorDisplay.style.display = "flex";
     return;
   }
 
   pass_1_scope_analysis(tokens, scopes);
+
+  if (Errors.length > 0) {
+    errorDisplay.textContent = `[Line ${Errors[0].line}] ${Errors[0].message}`;
+    errorDisplay.style.display = "flex";
+    return;
+  }
+
   const ast = parse_program(tokens, scopes);
+
+  if (Errors.length > 0) {
+    errorDisplay.textContent = `[Line ${Errors[0].line}] ${Errors[0].message}`;
+    errorDisplay.style.display = "flex";
+    return;
+  }
 
   hoist_program(ast, active_env);
   const interpreter = evaluate_program(ast, active_env);
@@ -112,7 +145,11 @@ function compile_and_run(source_code: string) {
       if (result.done || (result.value && result.value.status !== "running")) {
         is_running = false;
         if (result.value?.status === "error") {
-          errorDisplay.textContent = result.value.message;
+          // Expose physical location of runtime crash
+          const prefix = result.value.line
+            ? `[Line ${result.value.line}] `
+            : "";
+          errorDisplay.textContent = `${prefix}${result.value.message}`;
           errorDisplay.style.display = "flex";
         }
         break;
@@ -142,6 +179,32 @@ resizeCanvas();
 const executeCode = () => {
   if (editorView) compile_and_run(editorView.state.doc.toString());
 };
+
+async function loadAssetIntoMemory(asset: any) {
+  // Mount Images for immediate rendering
+  if (asset.type.startsWith("image/")) {
+    const img = new Image();
+    img.src = asset.data;
+    await new Promise((resolve) => (img.onload = resolve));
+    imageAssets.set(asset.name, img);
+  }
+  // Mount Fonts directly to Document API using native CSSFontFace format
+  else if (
+    asset.name.endsWith(".ttf") ||
+    asset.name.endsWith(".otf") ||
+    asset.name.endsWith(".woff") ||
+    asset.name.endsWith(".woff2")
+  ) {
+    const fontName = asset.name.split(".")[0];
+    const font = new FontFace(fontName, `url(${asset.data})`);
+    try {
+      await font.load();
+      document.fonts.add(font);
+    } catch (e) {
+      console.error("Failed to load font", e);
+    }
+  }
+}
 
 async function initEditor() {
   resizeCanvas();
@@ -190,6 +253,58 @@ canvas.addEventListener("mousemove", (e) => {
 });
 
 // --- UI Controls ---
+function renderAssetList() {
+  assetList.innerHTML = "";
+  allAssets.forEach((asset) => {
+    const li = document.createElement("li");
+    li.textContent = asset.name;
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "🗑";
+    delBtn.className = "delete-asset-btn";
+    delBtn.onclick = async () => {
+      await delete_asset(asset.name);
+      imageAssets.delete(asset.name);
+      allAssets = allAssets.filter((a) => a.name !== asset.name);
+      renderAssetList();
+    };
+    li.appendChild(delBtn);
+    assetList.appendChild(li);
+  });
+}
+btnAssets.addEventListener("click", () => {
+  renderAssetList();
+  assetModal.style.display = "flex";
+});
+
+btnCloseAssets.addEventListener("click", () => {
+  assetModal.style.display = "none";
+});
+
+assetInput.addEventListener("change", async (e) => {
+  const files = (e.target as HTMLInputElement).files;
+  if (!files) return;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const reader = new FileReader();
+
+    // Read the file as a robust base64 DataURL
+    reader.onload = async () => {
+      const asset = {
+        name: file.name,
+        type: file.type,
+        data: reader.result as string,
+      };
+      await save_asset(asset);
+      allAssets.push(asset);
+      await loadAssetIntoMemory(asset);
+      renderAssetList();
+    };
+    reader.readAsDataURL(file);
+  }
+  assetInput.value = ""; // Reset input so same file can trigger change again
+});
+
 btnRun.addEventListener("click", executeCode);
 btnStop.addEventListener("click", stop_engine);
 btnSave.addEventListener("click", () => {
