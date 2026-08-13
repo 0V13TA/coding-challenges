@@ -230,10 +230,6 @@ async function initEditor() {
 
 initEditor();
 
-editorContainer.innerHTML = "";
-editorView = createEditor(editorContainer, ExampleSource, executeCode);
-compile_and_run(ExampleSource);
-
 // --- System Keybindings & File Loading ---
 canvas.addEventListener("keydown", (e) => keys_down.add(e.key));
 canvas.addEventListener("keyup", (e) => keys_down.delete(e.key));

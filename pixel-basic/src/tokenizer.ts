@@ -216,19 +216,40 @@ export function tokenize(source: string): {
     }
 
     //-----------------------------------
-    // numbers
+    // numbers (including negative numbers)
     //-----------------------------------
 
-    if (isDigit(c)) {
-      let value = "";
+    const isNegativeNumber =
+      c === "-" &&
+      i + 1 < source.length &&
+      isDigit(source[i + 1]) &&
+      // Check if previous non-whitespace token indicates value-context (not subtraction)
+      (tokens.length === 0 ||
+        tokens[tokens.length - 1].type === "DECLARATION" ||
+        tokens[tokens.length - 1].type === "COMMA" ||
+        tokens[tokens.length - 1].type === "LPAREN" ||
+        tokens[tokens.length - 1].type === "LBRACKET" ||
+        tokens[tokens.length - 1].type === "NEWLINE" ||
+        tokens[tokens.length - 1].type === "PLUS" ||
+        tokens[tokens.length - 1].type === "MINUS" ||
+        tokens[tokens.length - 1].type === "MULTIPLY" ||
+        tokens[tokens.length - 1].type === "DIVIDE" ||
+        tokens[tokens.length - 1].type === "MODULO" ||
+        tokens[tokens.length - 1].type === "EQUALTO" ||
+        tokens[tokens.length - 1].type === "LTHAN" ||
+        tokens[tokens.length - 1].type === "GTHAN");
 
+    if (isDigit(c) || isNegativeNumber) {
+      let value = "";
+      if (c === "-") {
+        value += "-";
+        advance();
+      }
       while (i < source.length && (isDigit(source[i]) || source[i] === ".")) {
         value += source[i];
         advance();
       }
-
       addToken("NUMBER", value);
-
       continue;
     }
 

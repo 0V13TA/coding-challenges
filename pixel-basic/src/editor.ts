@@ -124,9 +124,9 @@ const builtinsArray = [
 const keywordsRegexStr = Array.from(KEYWORDS).join("|");
 const builtinsRegexStr = builtinsArray.join("|");
 
-// Captures: 1:Comment, 2:String, 3:Keyword, 4:Function, 5:Boolean, 6:Number, 7:Operator
+// Captures: 1:Comment, 2:String, 3:Keyword, 4:Function, 5:Boolean, 6:Number, 7:Operator, 8:Negative Number
 const syntaxRegex = new RegExp(
-  `(REM.*)|("[^"]*"|'[^']*')|\\b(${keywordsRegexStr})\\b|\\b(${builtinsRegexStr})\\b|\\b(TRUE|FALSE)\\b|\\b(\\d+(?:\\.\\d+)?)\\b|([+\\-*/%<>=!&|^~\\[\\](){},:]+)`,
+  `(REM.*)|("[^"]*"|'[^']*')|\\b(${keywordsRegexStr})\\b|\\b(${builtinsRegexStr})\\b|\\b(TRUE|FALSE)\\b|(-?\\b\\d+(?:\\.\\d+)?)\\b|([+\\-*/%<>=!&|^~\\[\\](){},:]+)`,
   "gi",
 );
 

@@ -554,17 +554,28 @@ function parse_assignment_or_call(
   state: ParserState,
 ): Assignment | FunctionCall | null {
   const startToken = peek(state);
-  const target = parse_expression(state, BP.ASSIGN);
-  const next_token = peek(state);
 
-  if (
-    next_token.type === "DECLARATION" ||
-    next_token.type === "ADD_DECLARE" ||
-    next_token.type === "SUB_DECLARE" ||
-    next_token.type === "DIV_DECLARE" ||
-    next_token.type === "MULT_DECLARE" ||
-    next_token.type === "MOD_DECLARE"
+  let is_assignment = false;
+  let lookahead = 1;
+  let next_tok = peek(state, lookahead);
+
+  // Fast forward to see if an assignment operator or array indexing follows the ID
+  if (next_tok.type === "LBRACKET") {
+    is_assignment = true;
+  } else if (
+    next_tok.type === "DECLARATION" ||
+    next_tok.type === "ADD_DECLARE" ||
+    next_tok.type === "SUB_DECLARE" ||
+    next_tok.type === "DIV_DECLARE" ||
+    next_tok.type === "MULT_DECLARE" ||
+    next_tok.type === "MOD_DECLARE"
   ) {
+    is_assignment = true;
+  }
+
+  // 1. Route to Assignment Parsing
+  if (is_assignment) {
+    const target = parse_expression(state, BP.ASSIGN);
     const operator = advance(state); // Consume the assignment operator
     const value = parse_expression(state, 0);
     return {
@@ -577,12 +588,21 @@ function parse_assignment_or_call(
     };
   }
 
-  if (target.type === "FunctionCall") {
-    return target;
-  }
+  // 2. Route to Function Call Parsing
+  const caller_token = advance(state); // Consume the ID
+  const args: ASTNode[] = [];
 
-  if (target.type === "Identifier") {
-    const args: ASTNode[] = [];
+  // Handle optional parentheses (e.g. DRAW_RECT(-25) or DRAW_RECT -25)
+  if (peek(state).type === "LPAREN") {
+    advance(state); // consume '('
+    if (peek(state).type !== "RPAREN") {
+      do {
+        args.push(parse_expression(state, 0));
+      } while (peek(state).type === "COMMA" && advance(state));
+    }
+    expect(state, "RPAREN", "Expected ')' after function arguments.");
+  } else {
+    // Parse space-separated arguments seamlessly
     while (
       state.currentIndex < state.tokens.length &&
       peek(state).type !== "NEWLINE" &&
@@ -591,25 +611,16 @@ function parse_assignment_or_call(
       args.push(parse_expression(state, 0));
       if (peek(state).type === "COMMA") advance(state);
     }
-    return {
-      type: "FunctionCall",
-      caller: target.name,
-      args,
-      line: startToken.line,
-      column: startToken.column,
-    };
   }
 
-  Errors.push({
-    message:
-      "Invalid statement structure. Expected assignment or function call.",
-    line: peek(state).line,
-    column: peek(state).column,
-  });
-
-  return null;
+  return {
+    type: "FunctionCall",
+    caller: caller_token.value,
+    args,
+    line: startToken.line,
+    column: startToken.column,
+  };
 }
-
 function parse_break(state: ParserState): BreakStatement | null {
   const t = advance(state);
   return { type: "BreakStatement", line: t.line, column: t.column };
