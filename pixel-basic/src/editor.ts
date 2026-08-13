@@ -14,7 +14,8 @@ import {
   historyField,
   indentWithTab,
 } from "@codemirror/commands";
-import { KEYWORDS } from "./tokenizer";
+// Import tokenize to scan the live document
+import { KEYWORDS, tokenize } from "./tokenizer";
 
 // --- Custom Theme ---
 const pixelBasicTheme = EditorView.theme(
@@ -56,7 +57,6 @@ const pixelBasicTheme = EditorView.theme(
       color: "var(--bg-base)",
       fontWeight: "bold",
     },
-
     // Custom Syntax Token Colors
     ".cm-comment": {
       color: "var(--color-comment)",
@@ -129,13 +129,16 @@ const syntaxRegex = new RegExp(
 const syntaxHighlightPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+
     constructor(view: EditorView) {
       this.decorations = this.getDeco(view);
     }
+
     update(update: ViewUpdate) {
       if (update.docChanged || update.viewportChanged)
         this.decorations = this.getDeco(update.view);
     }
+
     getDeco(view: EditorView) {
       const builder = new RangeSetBuilder<Decoration>();
       for (const { from, to } of view.visibleRanges) {
@@ -172,19 +175,74 @@ function pixelBasicCompletions(context: CompletionContext) {
   const word = context.matchBefore(/\w*/);
   if (!word || (word.from === word.to && !context.explicit)) return null;
 
+  // 1. Static Options
   const keywordOptions = Array.from(KEYWORDS).map((kw) => ({
     label: kw,
     type: "keyword",
   }));
+
   const builtinOptions = builtinsArray.map((fn) => ({
     label: fn,
     type: "function",
   }));
 
-  return { from: word.from, options: [...keywordOptions, ...builtinOptions] };
+  // 2. Dynamic Source Scanning
+  const sourceCode = context.state.doc.toString();
+  const { tokens } = tokenize(sourceCode); // Tokenize the live document
+
+  const userVars = new Set<string>();
+  const userFuncs = new Set<string>();
+
+  // Extract variables, functions, and parameters based on sequence
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+
+    // Variables: LET <ID> or CONST <ID>
+    if (
+      (token.type === "LET" || token.type === "CONST") &&
+      tokens[i + 1]?.type === "ID"
+    ) {
+      userVars.add(tokens[i + 1].value);
+    }
+    // Subroutines: SUB <ID> param1, param2 THEN
+    else if (token.type === "SUB" && tokens[i + 1]?.type === "ID") {
+      userFuncs.add(tokens[i + 1].value);
+
+      // Lookahead to gather parameters inside the function signature
+      let j = i + 2;
+      while (
+        j < tokens.length &&
+        tokens[j].type !== "THEN" &&
+        tokens[j].type !== "NEWLINE"
+      ) {
+        if (tokens[j].type === "ID") userVars.add(tokens[j].value);
+        j++;
+      }
+    }
+  }
+
+  // Format sets into CodeMirror options
+  const userVarOptions = Array.from(userVars).map((v) => ({
+    label: v,
+    type: "variable",
+  }));
+  const userFuncOptions = Array.from(userFuncs).map((f) => ({
+    label: f,
+    type: "function",
+  }));
+
+  return {
+    from: word.from,
+    options: [
+      ...keywordOptions,
+      ...builtinOptions,
+      ...userVarOptions,
+      ...userFuncOptions,
+    ],
+  };
 }
 
-// --- Initialization ---
+// --- Serialization ---
 export function serializeEditorState(view: EditorView) {
   return view.state.toJSON({ history: historyField });
 }
@@ -192,7 +250,7 @@ export function serializeEditorState(view: EditorView) {
 // --- Initialization ---
 export function createEditor(
   parentContainer: HTMLElement,
-  initialData: string | any, // <-- Allow JSON state objects
+  initialData: string | any,
   onRun: (code: string) => void,
 ): EditorView {
   const extensions = [
@@ -215,8 +273,6 @@ export function createEditor(
   ];
 
   let state;
-
-  // Conditionally boot from a raw string or deserialize from history
   if (typeof initialData === "string") {
     state = EditorState.create({ doc: initialData, extensions });
   } else {
