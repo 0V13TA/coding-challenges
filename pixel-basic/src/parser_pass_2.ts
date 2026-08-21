@@ -4,6 +4,7 @@ import type {
   ASTNode,
   Program,
   IfStatement,
+  ImportStatement,
   Identifier,
   ArrayLiteral,
   DictionaryLiteral,
@@ -216,11 +217,27 @@ export function parse_program(tokens: Token[], scopes: Scope[]): Program {
   };
 
   const body: ASTNode[] = [];
+  let seen_non_import = false;
 
   while (state.currentIndex < state.tokens.length) {
     if (peek(state).type === "NEWLINE") {
       advance(state);
       continue;
+    }
+
+    const token = peek(state);
+    
+    // --- Enforce top-of-file imports ---
+    if (token.type === "IMPORT") {
+      if (seen_non_import) {
+        Errors.push({
+          message: "IMPORT statements must appear at the top of the file.",
+          line: token.line,
+          column: token.column,
+        });
+      }
+    } else {
+      seen_non_import = true; 
     }
 
     const statement = parse_statement(state);
@@ -259,6 +276,10 @@ export function parse_expression(
 function parse_statement(state: ParserState): ASTNode | null {
   const token = peek(state);
   switch (token.type) {
+    case "IMPORT":
+      return parse_import(state);
+    case "EXPORT":
+      return parse_export(state);
     case "LET":
     case "CONST":
       return parse_declaration(state);
@@ -311,6 +332,7 @@ function parse_declaration(state: ParserState): VariableDeclaration | null {
   return {
     type: "VariableDeclaration",
     is_constant,
+    is_export: false,
     target: id_token.value,
     value: expression_value,
     line: keyword.line,
@@ -721,4 +743,66 @@ function parse_switch(state: ParserState): SwitchStatement | null {
     line: startToken.line,
     column: startToken.column,
   };
+}
+
+function parse_import(state: ParserState): ImportStatement | null {
+  const startToken = advance(state); // Consume 'IMPORT'
+  const symbols: string[] = [];
+
+  while (peek(state).type === "ID") {
+    const symbol_token = advance(state);
+    symbols.push(symbol_token.value);
+    
+    if (peek(state).type === "COMMA") {
+      advance(state); // Consume comma
+    } else {
+      break;
+    }
+  }
+
+  if (symbols.length === 0) {
+    Errors.push({
+      message: "Expected at least one variable or subroutine to import.",
+      line: startToken.line,
+      column: startToken.column,
+    });
+    return null;
+  }
+
+  if (!expect(state, "FROM", "Expected 'FROM' after import symbols.")) return null;
+  
+  const sourceToken = expect(state, "STRING", "Expected string literal for module source.");
+  if (!sourceToken) return null;
+
+  return {
+    type: "ImportStatement",
+    symbols,
+    source: sourceToken.value, // e.g., "physics.basic" or 'physics.basic'
+    line: startToken.line,
+    column: startToken.column,
+  };
+}
+
+function parse_export(state: ParserState): ASTNode | null {
+  advance(state); // Consume 'EXPORT'
+  const next_token = peek(state);
+
+  // Safely pass parsing downstream and mutate the return node
+  if (next_token.type === "LET" || next_token.type === "CONST") {
+    const decl = parse_declaration(state) as VariableDeclaration | null;
+    if (decl) decl.is_export = true;
+    return decl;
+  } else if (next_token.type === "SUB") {
+    const sub = parse_subroutine(state) as SubDeclaration | null;
+    if (sub) sub.is_export = true;
+    return sub;
+  } 
+  
+  Errors.push({
+    message: `Unexpected token '${next_token.value}' after EXPORT. Only variables and subroutines can be exported.`,
+    line: next_token.line,
+    column: next_token.column,
+  });
+  advance(state);
+  return null;
 }

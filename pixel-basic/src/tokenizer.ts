@@ -14,6 +14,9 @@ export type TokenType =
   | "SWITCH"
   | "CASE"
   | "DEFAULT"
+  | "IMPORT"
+  | "EXPORT"
+  | "FROM"
   | "EQUALTO"
   | "NOTEQUALTO"
   | "LTEQUAL"
@@ -78,6 +81,9 @@ export const KEYWORDS = new Set([
   "SWITCH",
   "CASE",
   "DEFAULT",
+  "IMPORT",
+  "EXPORT",
+  "FROM",
 ]);
 
 const TWO_CHAR_OPERATORS: Record<string, string> = {

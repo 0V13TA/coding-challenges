@@ -22,6 +22,7 @@ export function hoist_program(program: Program, env: Environment) {
         arity: node.parameters.length,
         is_native: false,
         declaration: node,
+        closure: env,
       });
     }
   }
@@ -317,7 +318,8 @@ export function* evaluate_program(
       if (func_entry.is_native && func_entry.native_fn)
         return func_entry.native_fn(...evaluated_args);
       else if (func_entry.declaration) {
-        const sub_env = create_environment(env, env.functionMap);
+        const parent_env = func_entry.closure || env;
+        const sub_env = create_environment(parent_env, parent_env.functionMap);
         func_entry.declaration.parameters.forEach((param_name, idx) =>
           sub_env.define(param_name, evaluated_args[idx]),
         );

@@ -73,6 +73,7 @@ export type FunctionCall = {
 export type VariableDeclaration = {
   type: "VariableDeclaration";
   is_constant: boolean;
+  is_export: boolean;
   target: string;
   value: ASTNode;
   line: number;
@@ -134,6 +135,15 @@ export type SubDeclaration = {
   name: string;
   parameters: string[];
   body: ASTNode[];
+  is_export: boolean;
+  line: number;
+  column: number;
+};
+
+export type ImportStatement = {
+  type: "ImportStatement";
+  symbols: string[];
+  source: string;
   line: number;
   column: number;
 };
@@ -158,6 +168,7 @@ export type ASTNode =
   | ContinueStatement
   | ReturnStatement
   | SubDeclaration
+  | ImportStatement
   | Program;
 
 export type Program = {

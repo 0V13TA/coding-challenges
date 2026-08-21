@@ -19,6 +19,7 @@ export type Callable = {
   is_native: boolean;
   declaration?: SubDeclaration;
   native_fn?: (...args: any[]) => any;
+  closure?: Environment;
 };
 
 export function create_environment(
