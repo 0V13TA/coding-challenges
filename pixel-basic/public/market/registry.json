@@ -1,0 +1,16 @@
+[
+  {
+    "id": "pub_001",
+    "name": "Kinematic Drifter",
+    "description": "A smooth physics-based drifting simulation. Uses linear interpolation and mouse tracking.",
+    "author": "Ovieta",
+    "filename": "kine.zip"
+  },
+  {
+    "id": "pub_002",
+    "name": "Orbital Buffer",
+    "description": "Demonstrates rendering complex backgrounds using an off-screen HTML canvas buffer.",
+    "author": "Ovieta",
+    "filename": "orbital.zip"
+  }
+]

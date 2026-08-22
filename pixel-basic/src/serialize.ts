@@ -103,6 +103,30 @@ export async function update_project_timestamp(id: string): Promise<void> {
   });
 }
 
+export async function delete_project(id: string): Promise<void> {
+  const db = await getDB();
+  
+  // 1. Clean up associated files
+  const files = await get_project_files(id);
+  for (const f of files) {
+    await delete_file(f.id);
+  }
+  
+  // 2. Clean up associated assets
+  const assets = await get_project_assets(id);
+  for (const a of assets) {
+    await delete_asset(a.id);
+  }
+  
+  // 3. Delete the main project record
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PROJECTS_STORE, "readwrite");
+    const request = tx.objectStore(PROJECTS_STORE).delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
 // ==========================================
 // 2. FILE MANAGEMENT
 // ==========================================

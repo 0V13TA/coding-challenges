@@ -1,55 +1,52 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PIXEL BASIC - Dashboard</title>
-    <link rel="stylesheet" href="/src/style.css" />
-    <style>
-      .dashboard-container { padding: 40px; flex: 1; overflow-y: auto; }
-      .dashboard-grid { 
-        display: grid; 
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
-        gap: 20px; 
-        margin-top: 20px;
-      }
-      .project-card {
-        background: var(--bg-panel);
-        border: var(--ui-border);
-        padding: 20px;
-        box-shadow: var(--ui-shadow);
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .project-card h3 { margin: 0; color: var(--text-accent); }
-      .project-card p { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
-    </style>
-  </head>
-  <body>
-    <div id="app">
-      <header id="top-bar">
-        <div class="brand">PIXEL BASIC : DASHBOARD</div>
-        <div class="controls">
-          <a href="/market.html" class="control-btn" style="text-decoration: none;">🛒 MARKET</a>
-          <a href="/docs.html" class="control-btn" style="text-decoration: none;">📖 DOCS</a>
-          <a href="/editor.html" class="control-btn play-btn" style="text-decoration: none;">➕ NEW PROJECT</a>
-        </div>
-      </header>
-      
-      <main class="dashboard-container">
-        <h2 style="margin-top:0;">Local Projects</h2>
-        <div class="dashboard-grid" id="project-list">
-          
-          <!-- Placeholder Card -->
-          <div class="project-card">
-            <h3>Default Workspace</h3>
-            <p>Last edited: Just now</p>
-            <a href="/editor.html" class="control-btn" style="text-decoration: none; text-align: center; margin-top: 10px;">OPEN EDITOR</a>
-          </div>
-          
-        </div>
-      </main>
-    </div>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PIXEL BASIC - Marketplace</title>
+  <link rel="stylesheet" href="/src/style.css" />
+  <style>
+    .dashboard-container { padding: 40px; flex: 1; overflow-y: auto; }
+    .dashboard-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+      gap: 20px; 
+      margin-top: 20px;
+    }
+    .project-card {
+      background: var(--bg-panel);
+      border: var(--ui-border);
+      padding: 20px;
+      box-shadow: var(--ui-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .project-card h3 { margin: 0; color: var(--text-accent); }
+    .project-card p { margin: 0; font-size: 0.9rem; color: var(--text-main); line-height: 1.4; flex: 1; }
+    .meta-text { font-size: 0.8rem; color: var(--text-muted); font-style: italic; }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <header id="top-bar">
+      <div class="brand">PIXEL BASIC : MARKETPLACE</div>
+      <div class="controls">
+        <a href="/" class="control-btn" style="text-decoration: none;">🏠 DASHBOARD</a>
+        <a href="/docs.html" class="control-btn" style="text-decoration: none;">📖 DOCS</a>
+      </div>
+    </header>
+
+    <main class="dashboard-container">
+      <h2 style="margin-top:0;">Discover Projects</h2>
+      <div class="dashboard-grid" id="market-list">
+        <p>Loading registry...</p>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="/src/market.ts"></script>
+</body>
+
 </html>

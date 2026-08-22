@@ -1,5 +1,13 @@
 import JSZip from "jszip";
-import { get_projects, create_project, save_file, get_project_files, get_project_assets, save_asset } from "./serialize";
+import { 
+  get_projects, 
+  create_project, 
+  save_file, 
+  get_project_files, 
+  get_project_assets, 
+  save_asset, 
+  delete_project 
+} from "./serialize";
 import "./style.css";
 
 const projectList = document.getElementById("project-list") as HTMLElement;
@@ -122,9 +130,11 @@ async function initDashboard() {
     card.innerHTML = `
       <h3>${proj.name}</h3>
       <p>Last edited: ${date}</p>
-      <div style="display: flex; gap: 8px; margin-top: 10px;">
+      <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
         <a href="/editor.html?id=${proj.id}" class="control-btn" style="flex: 1; text-decoration: none; text-align: center;">OPEN</a>
         <button class="control-btn export-btn" data-id="${proj.id}" data-name="${proj.name}">⬇ EXPORT</button>
+        <button class="control-btn publish-btn" title="Publish to Market">🚀 PUBLISH</button>
+        <button class="control-btn delete-btn" data-id="${proj.id}" data-name="${proj.name}" title="Delete Project">🗑️</button>
       </div>
     `;
     projectList.appendChild(card);
@@ -133,8 +143,34 @@ async function initDashboard() {
   // Attach export listeners dynamically
   document.querySelectorAll(".export-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
-      const target = e.target as HTMLButtonElement;
+      const target = e.currentTarget as HTMLButtonElement;
       exportProject(target.getAttribute("data-id")!, target.getAttribute("data-name")!);
+    });
+  });
+
+  // Attach publish listeners
+  document.querySelectorAll(".publish-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      alert(
+        "MARKETPLACE PUBLISHING WORKFLOW:\n\n" +
+        "1. Click 'EXPORT' to download your project as a .zip.\n" +
+        "2. Move the .zip file into your 'public/market/' folder.\n" +
+        "3. Open 'public/market/registry.json' and add your project's metadata to the list."
+      );
+    });
+  });
+
+  // Attach delete listeners
+  document.querySelectorAll(".delete-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const target = e.currentTarget as HTMLButtonElement;
+      const id = target.getAttribute("data-id")!;
+      const name = target.getAttribute("data-name")!;
+      
+      if (confirm(`Are you absolutely sure you want to delete "${name}"? This action cannot be undone.`)) {
+        await delete_project(id);
+        initDashboard(); // Refresh UI list
+      }
     });
   });
 }
