@@ -21,6 +21,7 @@ export type TokenType =
   | "NOTEQUALTO"
   | "LTEQUAL"
   | "GTEQUAL"
+  | "COLON_EQUAL"
   | "ADD_DECLARE"
   | "SUB_DECLARE"
   | "MULT_DECLARE"
@@ -96,6 +97,7 @@ const TWO_CHAR_OPERATORS: Record<string, string> = {
   "*=": "MULT_DECLARE",
   "/=": "DIV_DECLARE",
   "%=": "MOD_DECLARE",
+  ":=": "COLON_EQUAL",
 };
 
 const ONE_CHAR_OPERATORS: Record<string, string> = {

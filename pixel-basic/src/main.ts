@@ -76,7 +76,7 @@ function compile_and_run(source_code: string) {
   resizeCanvas();
 
   const update_env = (name: string, value: any) => {
-    if (active_env) active_env.assign(name, value);
+    if (active_env) active_env.assign(name, { type: Number.isInteger(value) ? "i32" : "f32", value });
   };
 
   active_env = create_environment(
@@ -84,8 +84,8 @@ function compile_and_run(source_code: string) {
     define_builtin_functions(ctx, keys_down, update_env, imageAssets),
   );
   define_builtin_constants(active_env, canvas.width, canvas.height);
-  active_env.assign("SCR_W", canvas.width);
-  active_env.assign("SCR_H", canvas.height);
+  active_env.assign("SCR_W", { type: "i32", value: canvas.width });
+  active_env.assign("SCR_H", { type: "i32", value: canvas.height });
 
   let scopes: Scope[] = [
     {
@@ -243,8 +243,8 @@ canvas.addEventListener("mousemove", (e) => {
     const mouseY = e.clientY - rect.top;
 
     // Update the runtime environment variables
-    active_env.assign("MOUSE_X", mouseX);
-    active_env.assign("MOUSE_Y", mouseY);
+    active_env.assign("MOUSE_X", { type: "i32", value: mouseX });
+    active_env.assign("MOUSE_Y", { type: "i32", value: mouseY });
   }
 });
 

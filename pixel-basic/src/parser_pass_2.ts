@@ -313,6 +313,7 @@ function parse_statement(state: ParserState): ASTNode | null {
 function parse_declaration(state: ParserState): VariableDeclaration | null {
   const keyword = advance(state);
   const is_constant = keyword.type === "CONST";
+
   const id_token = expect(
     state,
     "ID",
@@ -320,12 +321,34 @@ function parse_declaration(state: ParserState): VariableDeclaration | null {
   );
   if (!id_token) return null;
 
-  const assign_token = expect(
-    state,
-    "DECLARATION",
-    "Expected '=' after variable name.",
-  );
-  if (!assign_token) return null;
+  let value_type: string | null = null;
+  let assign_token = peek(state);
+
+  // 1. Explicit Type Annotation
+  if (assign_token.type === "COLON") {
+    advance(state); // consume ':'
+    const type_token = expect(state, "ID", "Expected type after ':'.");
+    if (type_token) value_type = type_token.value;
+    
+    assign_token = peek(state);
+    expect(state, "DECLARATION", "Expected '=' after type annotation.");
+  } 
+  // 2. Type Inference
+  else if (assign_token.type === "COLON_EQUAL") {
+    advance(state); // consume ':='
+  } 
+  // 3. Fallback / Untyped
+  else if (assign_token.type === "DECLARATION") {
+    advance(state); // consume '='
+  } 
+  else {
+    Errors.push({
+      message: "Expected ':', ':=', or '=' after variable name.",
+      line: id_token.line,
+      column: id_token.column,
+    });
+    return null;
+  }
 
   const expression_value = parse_expression(state, 0);
 
@@ -334,6 +357,7 @@ function parse_declaration(state: ParserState): VariableDeclaration | null {
     is_constant,
     is_export: false,
     target: id_token.value,
+    value_type,
     value: expression_value,
     line: keyword.line,
     column: keyword.column,
@@ -528,25 +552,43 @@ function parse_if(state: ParserState): IfStatement | null {
 
 function parse_subroutine(state: ParserState): SubDeclaration | null {
   const startToken = advance(state); // Consume 'SUB'
-
   const name_token = expect(state, "ID", "Expected subroutine name.");
   if (!name_token) return null;
 
-  const parameters: string[] = [];
+  const parameters: { name: string; type: string }[] = [];
 
-  while (peek(state).type !== "THEN") {
+  // Parse parameters with optional types
+  while (peek(state).type !== "THEN" && peek(state).type !== "COLON") {
     if (peek(state).type === "COMMA") {
       advance(state);
       continue;
     }
+
     const param_token = expect(state, "ID", "Expected parameter name.");
-    if (param_token) parameters.push(param_token.value);
+    if (!param_token) break;
+
+    let param_type = "any";
+    if (peek(state).type === "COLON") {
+      advance(state); // Consume ':'
+      const type_token = expect(state, "ID", "Expected parameter type after ':'.");
+      if (type_token) param_type = type_token.value;
+    }
+
+    parameters.push({ name: param_token.value, type: param_type });
+  }
+
+  let return_type: string | null = null;
+  
+  // Parse optional return type
+  if (peek(state).type === "COLON") {
+    advance(state); // consume ':'
+    const ret_type_token = expect(state, "ID", "Expected return type after ':'.");
+    if (ret_type_token) return_type = ret_type_token.value;
   }
 
   expect(state, "THEN", "Expected 'THEN' after SUB arguments.");
 
   const body: ASTNode[] = [];
-
   while (
     state.currentIndex < state.tokens.length &&
     peek(state).type !== "END"
@@ -566,7 +608,9 @@ function parse_subroutine(state: ParserState): SubDeclaration | null {
     type: "SubDeclaration",
     name: name_token.value,
     parameters,
+    return_type,
     body,
+    is_export: false,
     line: startToken.line,
     column: startToken.column,
   };

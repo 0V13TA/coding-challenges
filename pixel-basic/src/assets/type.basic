@@ -1,0 +1,66 @@
+REM ==========================================
+REM PIXEL-BASIC: STATIC TYPE SYSTEM TEST
+REM ==========================================
+SCREEN 800, 600
+
+REM 1. Explicitly Typed Variables
+LET x: f32 = 400
+LET y: f32 = 100
+LET radius: f32 = 25
+
+REM 2. Type Inference (:=)
+LET vel_x := 6.5
+LET vel_y := 0.0
+LET is_running := TRUE
+
+CONST gravity: f32 = 0.6
+CONST bounce_loss := 0.85
+
+REM 3. Typed Subroutines
+SUB apply_gravity current_v: f32, grav: f32 : f32 THEN
+  RETURN current_v + grav
+END SUB
+
+SUB is_out_of_bounds pos: f32, max: f32, r: f32 : bool THEN
+  IF pos + r > max THEN
+    RETURN TRUE
+  END IF
+  IF pos - r < 0 THEN
+    RETURN TRUE
+  END IF
+  RETURN FALSE
+END SUB
+
+PRINT "Booting Typed Physics Simulation..."
+
+REM 4. Main Engine Loop
+WHILE is_running == TRUE THEN
+  CLEAR_SCREEN
+  FILL_COLOR 30, 30, 46
+  DRAW_RECT 0, 0, SCR_W, SCR_H
+
+  REM Apply math via typed subroutine
+  vel_y = apply_gravity(vel_y, gravity)
+  
+  x += vel_x
+  y += vel_y
+
+  REM Check bounds with typed subroutine
+  IF is_out_of_bounds(y, SCR_H, radius) == TRUE THEN
+    y = SCR_H - radius
+    vel_y = (vel_y * -1) * bounce_loss
+  END IF
+
+  IF is_out_of_bounds(x, SCR_W, radius) == TRUE THEN
+    vel_x = vel_x * -1
+  END IF
+
+  REM Draw the object
+  FILL_COLOR 166, 227, 161
+  NO_STROKE
+  DRAW_CIRCLE x, y, radius
+
+  IF IS_KEY_DOWN("Escape") THEN
+    is_running = FALSE
+  END IF
+END WHILE

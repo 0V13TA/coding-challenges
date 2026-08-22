@@ -75,6 +75,7 @@ export type VariableDeclaration = {
   is_constant: boolean;
   is_export: boolean;
   target: string;
+  value_type: string | null;
   value: ASTNode;
   line: number;
   column: number;
@@ -133,7 +134,8 @@ export type ReturnStatement = {
 export type SubDeclaration = {
   type: "SubDeclaration";
   name: string;
-  parameters: string[];
+  parameters: { name: string; type: string }[];
+  return_type: string | null;
   body: ASTNode[];
   is_export: boolean;
   line: number;
