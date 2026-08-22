@@ -96,6 +96,7 @@ body {
   border-color: #a6e3a1;
   color: #a6e3a1;
 }
+
 .stop-btn {
   border-color: #f38ba8;
   color: #f38ba8;
@@ -230,6 +231,7 @@ body {
 #asset-list::-webkit-scrollbar {
   width: 4px;
 }
+
 #asset-list::-webkit-scrollbar-thumb {
   background: var(--text-accent);
 }
@@ -257,19 +259,187 @@ body {
   transform: scale(1.1);
 }
 
+/* --- 3-Pane Layout Adjustments --- */
+#sidebar-pane {
+  flex: 0 0 200px;
+  background: var(--bg-base);
+  border-right: var(--ui-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+#active-file-tab {
+  background: var(--bg-panel);
+  color: var(--text-accent);
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.drag-divider {
+  width: 4px;
+  background-color: var(--bg-header);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease;
+  z-index: 50;
+}
+
+.drag-divider:hover,
+.drag-divider.dragging {
+  background-color: var(--text-accent);
+}
+
+/* --- Sidebar Tree UI --- */
+.sidebar-section {
+  margin-bottom: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px 4px 16px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.icon-btn:hover {
+  color: var(--text-main);
+}
+
+.tree-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tree-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.tree-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tree-item.active {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: var(--text-accent);
+  color: var(--text-accent);
+  font-weight: bold;
+}
+
+.tree-item-delete {
+  background: transparent;
+  border: none;
+  color: #f38ba8;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.tree-item:hover .tree-item-delete {
+  opacity: 1;
+}
+
+.tree-item-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tree-item-action {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  padding: 0 4px;
+  font-size: 0.9rem;
+}
+
+.tree-item-action:hover {
+  color: var(--text-main);
+}
+
+.tree-item-action.delete:hover {
+  color: #f38ba8;
+}
+
+.tree-item:hover .tree-item-action {
+  opacity: 1;
+}
+
+
 /* --- Responsive Adjustments --- */
 @media (max-width: 768px) {
+  .brand {
+    display: none;
+  }
+
+  #top-bar {
+    padding: 8px 10px;
+  }
+
+  .controls {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+    /* Room for scrollbar */
+  }
+
+  .control-btn {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+
   #workspace {
     flex-direction: column;
+  }
+
+  #sidebar-pane {
+    flex: 0 0 200px !important;
+    border-right: none;
+    border-bottom: var(--ui-border);
+    width: 100%;
+  }
+
+  /* Flip dividers to horizontal */
+  .drag-divider {
+    width: 100%;
+    height: 12px;
+    /* Thicker for touch targets */
+    cursor: row-resize;
   }
 
   #editor-pane {
     border-right: none;
     border-bottom: var(--ui-border);
-    flex: 0 0 45vh; /* Fixed height ratio on mobile */
+    flex: 0 0 35vh !important;
+    width: 100%;
   }
 
-  .brand {
-    display: none; /* Reclaim space for controls on small screens */
+  #canvas-pane {
+    flex: 1 !important;
+    width: 100%;
   }
 }

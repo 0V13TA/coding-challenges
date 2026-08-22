@@ -1,64 +1,217 @@
 import type { EditorView } from "codemirror";
-import ExampleSource from "./assets/p.basic?raw";
-import { createEditor, serializeEditorState } from "./editor";
+import { createEditor } from "./editor";
 import { evaluate_program, hoist_program } from "./evaluator";
-import {
-  define_builtin_constants,
-  define_builtin_functions,
-  Errors,
-  pass_1_scope_analysis,
-  type Scope,
-  type SymbolEntry,
-} from "./parser_pass_1";
+import { define_builtin_constants, define_builtin_functions, Errors, pass_1_scope_analysis, type Scope, type SymbolEntry } from "./parser_pass_1";
 import { parse_program } from "./parser_pass_2";
 import { create_environment, type Environment } from "./runtime";
 import "./style.css";
 import { tokenize } from "./tokenizer";
-import {
-  delete_asset,
-  load_basic_code,
-  save_asset,
-  save_basic_code,
-} from "./serialize";
+import { delete_asset, delete_file, get_project_assets, get_project_files, save_asset, save_file, rename_file, rename_asset, type ProjectFile } from "./serialize";
+
+const urlParams = new URLSearchParams(window.location.search);
+const PROJECT_ID = urlParams.get("id");
+if (!PROJECT_ID) window.location.href = "/";
 
 const canvas = document.getElementById("graphics-canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
-if (!ctx) throw new Error("Sorry but your system does not support HTML Canvas");
-
-function resizeCanvas() {
-  canvas.width = canvasWrapper.clientWidth;
-  canvas.height = canvasWrapper.clientHeight;
-}
-
 const canvasWrapper = document.getElementById("canvas-wrapper") as HTMLElement;
-const editorContainer = document.getElementById(
-  "editor-container",
-) as HTMLElement;
+const editorContainer = document.getElementById("editor-container") as HTMLElement;
 const errorDisplay = document.getElementById("error-display") as HTMLElement;
-const inputFile = document.getElementById("file-input") as HTMLInputElement;
+const activeFileTab = document.getElementById("active-file-tab") as HTMLElement;
 
 const btnRun = document.getElementById("btn-run") as HTMLButtonElement;
 const btnStop = document.getElementById("btn-stop") as HTMLButtonElement;
-const btnSave = document.getElementById("btn-save") as HTMLButtonElement;
-const btnAssets = document.getElementById("btn-assets") as HTMLButtonElement;
-
-const assetModal = document.getElementById("asset-modal") as HTMLElement;
-const btnCloseAssets = document.getElementById(
-  "btn-close-assets",
-) as HTMLButtonElement;
+const btnFullscreen = document.getElementById("btn-fullscreen") as HTMLButtonElement;
+const btnNewFile = document.getElementById("btn-new-file") as HTMLButtonElement;
+const inputFile = document.getElementById("file-input") as HTMLInputElement;
 const assetInput = document.getElementById("asset-input") as HTMLInputElement;
-const assetList = document.getElementById("asset-list") as HTMLUListElement;
+
+const fileTree = document.getElementById("file-tree") as HTMLUListElement;
+const assetTree = document.getElementById("asset-tree") as HTMLUListElement;
 
 let editorView: EditorView | null = null;
 let animation_frame_id: number | null = null;
 let active_env: Environment | null = null;
 const keys_down = new Set<string>();
 
-// --- Memory Registry ---
 export const imageAssets = new Map<string, HTMLImageElement>();
 let allAssets: any[] = [];
+let allFiles: ProjectFile[] = [];
+let activeFilename = "main.basic";
 
-// --- Execution Pipeline ---
+function resizeCanvas() {
+  canvas.width = canvasWrapper.clientWidth;
+  canvas.height = canvasWrapper.clientHeight;
+}
+
+// Ensure canvas resizes perfectly when entering/exiting fullscreen
+document.addEventListener("fullscreenchange", resizeCanvas);
+
+// --- File System & IDE State ---
+async function saveCurrentFile() {
+  if (editorView && PROJECT_ID && activeFilename) {
+    const code = editorView.state.doc.toString();
+    await save_file(PROJECT_ID, activeFilename, code);
+    const f = allFiles.find(file => file.filename === activeFilename);
+    if (f) f.content = code;
+  }
+}
+
+async function switchFile(filename: string) {
+  await saveCurrentFile();
+  activeFilename = filename;
+  activeFileTab.textContent = filename;
+  const targetFile = allFiles.find(f => f.filename === filename);
+  const content = targetFile ? targetFile.content : "";
+  editorContainer.innerHTML = "";
+  editorView = createEditor(editorContainer, content, executeMain);
+  renderSidebar();
+}
+
+function renderSidebar() {
+  fileTree.innerHTML = "";
+  const sortedFiles = [...allFiles].sort((a, b) => {
+    if (a.filename === "main.basic") return -1;
+    if (b.filename === "main.basic") return 1;
+    return a.filename.localeCompare(b.filename);
+  });
+
+  sortedFiles.forEach(file => {
+    const li = document.createElement("li");
+    li.className = `tree-item ${file.filename === activeFilename ? "active" : ""}`;
+    li.innerHTML = `<span>📄 ${file.filename}</span>`;
+
+    if (file.filename !== "main.basic") {
+      const actions = document.createElement("div");
+      actions.className = "tree-item-actions";
+
+      // Rename Button
+      const renBtn = document.createElement("button");
+      renBtn.className = "tree-item-action";
+      renBtn.textContent = "✎";
+      renBtn.title = "Rename";
+      renBtn.onclick = async (e) => {
+        e.stopPropagation();
+        let newName = prompt(`Rename ${file.filename} to:`, file.filename);
+        if (!newName || newName === file.filename) return;
+        if (!newName.endsWith(".basic")) newName += ".basic";
+
+        if (allFiles.some(f => f.filename === newName)) {
+          alert("A file with this name already exists!");
+          return;
+        }
+
+        await rename_file(PROJECT_ID!, file.filename, newName, file.content);
+
+        const wasActive = activeFilename === file.filename;
+        file.id = `${PROJECT_ID}_${newName}`;
+        file.filename = newName;
+
+        if (wasActive) {
+          activeFilename = newName;
+          activeFileTab.textContent = newName;
+        }
+        renderSidebar();
+      };
+
+      // Delete Button
+      const delBtn = document.createElement("button");
+      delBtn.className = "tree-item-action delete";
+      delBtn.textContent = "x";
+      delBtn.title = "Delete";
+      delBtn.onclick = async (e) => {
+        e.stopPropagation();
+        if (confirm(`Delete ${file.filename}?`)) {
+          await delete_file(file.id);
+          allFiles = allFiles.filter(f => f.id !== file.id);
+          if (activeFilename === file.filename) switchFile("main.basic");
+          else renderSidebar();
+        }
+      };
+
+      actions.appendChild(renBtn);
+      actions.appendChild(delBtn);
+      li.appendChild(actions);
+    }
+    li.onclick = () => switchFile(file.filename);
+    fileTree.appendChild(li);
+  });
+
+  assetTree.innerHTML = "";
+  allAssets.forEach(asset => {
+    const li = document.createElement("li");
+    li.className = "tree-item";
+    const icon = asset.type.startsWith("image/") ? "🖼️" : "🔤";
+    li.innerHTML = `<span>${icon} ${asset.name}</span>`;
+
+    const actions = document.createElement("div");
+    actions.className = "tree-item-actions";
+
+    // Rename Asset Button
+    const renBtn = document.createElement("button");
+    renBtn.className = "tree-item-action";
+    renBtn.textContent = "✎";
+    renBtn.title = "Rename";
+    renBtn.onclick = async (e) => {
+      e.stopPropagation();
+      const newName = prompt(`Rename ${asset.name} to:`, asset.name);
+      if (!newName || newName === asset.name) return;
+
+      if (allAssets.some(a => a.name === newName)) {
+        alert("An asset with this name already exists!");
+        return;
+      }
+
+      await rename_asset(PROJECT_ID!, asset.name, newName, asset.type, asset.data);
+
+      // Update in-memory registry
+      if (imageAssets.has(asset.name)) {
+        imageAssets.set(newName, imageAssets.get(asset.name)!);
+        imageAssets.delete(asset.name);
+      }
+
+      asset.id = `${PROJECT_ID}_${newName}`;
+      asset.name = newName;
+      renderSidebar();
+    };
+
+    // Delete Asset Button
+    const delBtn = document.createElement("button");
+    delBtn.className = "tree-item-action delete";
+    delBtn.textContent = "x";
+    delBtn.title = "Delete";
+    delBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete asset ${asset.name}?`)) {
+        await delete_asset(asset.id);
+        imageAssets.delete(asset.name);
+        allAssets = allAssets.filter((a) => a.id !== asset.id);
+        renderSidebar();
+      }
+    };
+
+    actions.appendChild(renBtn);
+    actions.appendChild(delBtn);
+    li.appendChild(actions);
+    assetTree.appendChild(li);
+  });
+}
+
+btnNewFile.addEventListener("click", async () => {
+  if (!PROJECT_ID) return;
+  let name = prompt("Enter script path (e.g., utils/math.basic):", "new.basic");
+  if (!name) return;
+  if (!name.endsWith(".basic")) name += ".basic";
+  if (allFiles.some(f => f.filename === name)) {
+    alert("File already exists!");
+    return;
+  }
+  await save_file(PROJECT_ID, name, "");
+  allFiles.push({ id: `${PROJECT_ID}_${name}`, project_id: PROJECT_ID, filename: name, content: "" });
+  switchFile(name);
+});
+
+// --- Execution & Module Loader Pipeline ---
 function stop_engine() {
   if (animation_frame_id !== null) {
     cancelAnimationFrame(animation_frame_id);
@@ -71,60 +224,129 @@ function stop_engine() {
   console.log("Engine Halted.");
 }
 
-function compile_and_run(source_code: string) {
+function compile_and_run(entry_filename: string) {
   stop_engine();
   resizeCanvas();
 
   const update_env = (name: string, value: any) => {
-    if (active_env) active_env.assign(name, { type: Number.isInteger(value) ? "i32" : "f32", value });
+    if (active_env)
+      active_env.assign(name, { type: Number.isInteger(value) ? "i32" : "f32", value });
   };
 
-  active_env = create_environment(
-    null,
-    define_builtin_functions(ctx, keys_down, update_env, imageAssets),
-  );
-  define_builtin_constants(active_env, canvas.width, canvas.height);
-  active_env.assign("SCR_W", { type: "i32", value: canvas.width });
-  active_env.assign("SCR_H", { type: "i32", value: canvas.height });
+  const moduleCache = new Map<string, { env: Environment; ast: import("./ast_types").Program }>();
+  const loadingStack = new Set<string>();
 
-  let scopes: Scope[] = [
-    {
-      id: 0,
-      parent_id: null,
-      start_token: 0,
-      end_token: 0,
-      symbols: new Map<string, SymbolEntry>(),
-    },
-  ];
+  function load_module(filename: string): { env: Environment; ast: import("./ast_types").Program } | null {
+    if (moduleCache.has(filename)) return moduleCache.get(filename)!;
+    if (loadingStack.has(filename)) {
+      errorDisplay.textContent = `Circular import detected: ${[...loadingStack, filename].join(" -> ")}`;
+      errorDisplay.style.display = "flex";
+      return null;
+    }
+    loadingStack.add(filename);
 
-  // 1. Wipe old parse records
-  Errors.length = 0;
-  const { tokens, errors: lexErrors } = tokenize(source_code);
+    const fileData = allFiles.find((f) => f.filename === filename);
+    if (!fileData) {
+      errorDisplay.textContent = `Module not found: '${filename}'`;
+      errorDisplay.style.display = "flex";
+      return null;
+    }
 
-  if (lexErrors && lexErrors.length > 0) {
-    errorDisplay.textContent = `[Line ${lexErrors[0].line}] ${lexErrors[0].message}`;
-    errorDisplay.style.display = "flex";
-    return;
+    const mod_env = create_environment(
+      null,
+      define_builtin_functions(ctx, keys_down, update_env, imageAssets)
+    );
+    define_builtin_constants(mod_env, canvas.width, canvas.height);
+    mod_env.assign("SCR_W", { type: "i32", value: canvas.width });
+    mod_env.assign("SCR_H", { type: "i32", value: canvas.height });
+
+    const scopes: Scope[] = [
+      { id: 0, parent_id: null, start_token: 0, end_token: 0, symbols: new Map<string, SymbolEntry>() },
+    ];
+    Errors.length = 0;
+
+    const { tokens, errors: lexErrors } = tokenize(fileData.content);
+    if (lexErrors && lexErrors.length > 0) {
+      errorDisplay.textContent = `[${filename}] Lex Error: ${lexErrors[0].message}`;
+      errorDisplay.style.display = "flex";
+      return null;
+    }
+
+    pass_1_scope_analysis(tokens, scopes);
+    if (Errors.length > 0) {
+      errorDisplay.textContent = `[${filename}] Scope Error: ${Errors[0].message}`;
+      errorDisplay.style.display = "flex";
+      return null;
+    }
+
+    const ast = parse_program(tokens, scopes);
+    if (Errors.length > 0) {
+      errorDisplay.textContent = `[${filename}] Parse Error: ${Errors[0].message}`;
+      errorDisplay.style.display = "flex";
+      return null;
+    }
+
+    for (const node of ast.body) {
+      if (node.type === "ImportStatement") {
+        const targetMod = load_module(node.source);
+        if (!targetMod) return null;
+
+        for (const sym of node.symbols) {
+          if (targetMod.env.functionMap.has(sym)) {
+            const fn_entry = targetMod.env.functionMap.get(sym)!;
+            if (fn_entry.declaration && !fn_entry.declaration.is_export) {
+              errorDisplay.textContent = `[${filename}] Import Error: Subroutine '${sym}' is not exported in '${node.source}'.`;
+              errorDisplay.style.display = "flex";
+              return null;
+            }
+            mod_env.functionMap.set(sym, fn_entry);
+          } else {
+            let is_exported = false;
+            for (const tNode of targetMod.ast.body) {
+              if (tNode.type === "VariableDeclaration" && tNode.target === sym && tNode.is_export) {
+                is_exported = true;
+                break;
+              }
+            }
+            if (!is_exported) {
+              errorDisplay.textContent = `[${filename}] Import Error: Variable '${sym}' is not exported in '${node.source}'.`;
+              errorDisplay.style.display = "flex";
+              return null;
+            }
+            const val = targetMod.env.get(sym);
+            if (val !== null) mod_env.define(sym, val);
+          }
+        }
+      }
+    }
+
+    hoist_program(ast, mod_env);
+
+    if (filename !== entry_filename) {
+      const interpreter = evaluate_program(ast, mod_env);
+      let result = interpreter.next();
+      while (!result.done) {
+        if (result.value && result.value.status === "error") {
+          const prefix = result.value.line ? `[Line ${result.value.line}] ` : "";
+          errorDisplay.textContent = `[${filename}] Runtime Error ${prefix}: ${result.value.message}`;
+          errorDisplay.style.display = "flex";
+          return null;
+        }
+        result = interpreter.next();
+      }
+    }
+
+    loadingStack.delete(filename);
+    const modData = { env: mod_env, ast };
+    moduleCache.set(filename, modData);
+    return modData;
   }
 
-  pass_1_scope_analysis(tokens, scopes);
+  const entryModule = load_module(entry_filename);
+  if (!entryModule) return;
 
-  if (Errors.length > 0) {
-    errorDisplay.textContent = `[Line ${Errors[0].line}] ${Errors[0].message}`;
-    errorDisplay.style.display = "flex";
-    return;
-  }
-
-  const ast = parse_program(tokens, scopes);
-
-  if (Errors.length > 0) {
-    errorDisplay.textContent = `[Line ${Errors[0].line}] ${Errors[0].message}`;
-    errorDisplay.style.display = "flex";
-    return;
-  }
-
-  hoist_program(ast, active_env);
-  const interpreter = evaluate_program(ast, active_env);
+  active_env = entryModule.env;
+  const interpreter = evaluate_program(entryModule.ast, active_env);
 
   const TARGET_FPS = 60;
   const STEP_MS = 1000 / TARGET_FPS;
@@ -137,18 +359,17 @@ function compile_and_run(source_code: string) {
 
     if (delta_time > 250) delta_time = 250;
     accumulator += delta_time;
+
     let is_running = true;
 
     while (accumulator >= STEP_MS) {
       const result = interpreter.next();
       accumulator -= STEP_MS;
+
       if (result.done || (result.value && result.value.status !== "running")) {
         is_running = false;
         if (result.value?.status === "error") {
-          // Expose physical location of runtime crash
-          const prefix = result.value.line
-            ? `[Line ${result.value.line}] `
-            : "";
+          const prefix = result.value.line ? `[Line ${result.value.line}] ` : "";
           errorDisplay.textContent = `${prefix}${result.value.message}`;
           errorDisplay.style.display = "flex";
         }
@@ -168,32 +389,21 @@ function compile_and_run(source_code: string) {
   animation_frame_id = requestAnimationFrame(engine_tick);
 }
 
-// --- Editor Setup ---
-const btnToggleEditor = document.getElementById(
-  "btn-toggle-editor",
-) as HTMLButtonElement;
-const dragDivider = document.getElementById("drag-divider") as HTMLElement;
-const editorPane = document.getElementById("editor-pane") as HTMLElement;
-
-resizeCanvas();
-const executeCode = () => {
-  if (editorView) compile_and_run(editorView.state.doc.toString());
+const executeMain = async () => {
+  await saveCurrentFile();
+  const mainFile = allFiles.find(f => f.filename === "main.basic");
+  if (mainFile) compile_and_run("main.basic");
 };
 
+// --- Initialization ---
 async function loadAssetIntoMemory(asset: any) {
-  // Mount Images for immediate rendering
   if (asset.type.startsWith("image/")) {
     const img = new Image();
     img.src = asset.data;
     await new Promise((resolve) => (img.onload = resolve));
     imageAssets.set(asset.name, img);
-  }
-  // Mount Fonts directly to Document API using native CSSFontFace format
-  else if (
-    asset.name.endsWith(".ttf") ||
-    asset.name.endsWith(".otf") ||
-    asset.name.endsWith(".woff") ||
-    asset.name.endsWith(".woff2")
+  } else if (
+    asset.name.endsWith(".ttf") || asset.name.endsWith(".otf") || asset.name.endsWith(".woff") || asset.name.endsWith(".woff2")
   ) {
     const fontName = asset.name.split(".")[0];
     const font = new FontFace(fontName, `url(${asset.data})`);
@@ -207,135 +417,101 @@ async function loadAssetIntoMemory(asset: any) {
 }
 
 async function initEditor() {
+  if (!PROJECT_ID) return;
   resizeCanvas();
   editorContainer.innerHTML = "";
 
-  // 1. Await database load
-  const savedData = await load_basic_code();
+  allAssets = await get_project_assets(PROJECT_ID);
+  for (const asset of allAssets) await loadAssetIntoMemory(asset);
 
-  // 2. Boot from DB if it exists, otherwise fallback to the demo string
-  const initialData = savedData ? savedData : ExampleSource;
+  allFiles = await get_project_files(PROJECT_ID);
+  if (allFiles.length === 0) {
+    await save_file(PROJECT_ID, "main.basic", "");
+    allFiles = await get_project_files(PROJECT_ID);
+  }
 
-  editorView = createEditor(editorContainer, initialData, executeCode);
-  compile_and_run(editorView.state.doc.toString());
+  await switchFile("main.basic");
+  executeMain();
 
-  // 3. Initiate the 5-second auto-save loop
-  setInterval(() => {
-    if (editorView) {
-      const stateJSON = serializeEditorState(editorView);
-      save_basic_code(stateJSON);
-    }
-  }, 5000);
+  setInterval(saveCurrentFile, 5000);
 }
 
 initEditor();
 
-// --- System Keybindings & File Loading ---
+// --- Input & Import Handling ---
 canvas.addEventListener("keydown", (e) => keys_down.add(e.key));
 canvas.addEventListener("keyup", (e) => keys_down.delete(e.key));
 canvas.addEventListener("mousemove", (e) => {
   if (active_env) {
-    // Get the bounding rectangle of the canvas to offset the screen coordinates
     const rect = canvas.getBoundingClientRect();
-
-    // Calculate the mouse position relative to the canvas dimensions
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // Update the runtime environment variables
-    active_env.assign("MOUSE_X", { type: "i32", value: mouseX });
-    active_env.assign("MOUSE_Y", { type: "i32", value: mouseY });
+    active_env.assign("MOUSE_X", { type: "i32", value: e.clientX - rect.left });
+    active_env.assign("MOUSE_Y", { type: "i32", value: e.clientY - rect.top });
   }
 });
 
-// --- UI Controls ---
-function renderAssetList() {
-  assetList.innerHTML = "";
-  allAssets.forEach((asset) => {
-    const li = document.createElement("li");
-    li.textContent = asset.name;
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "🗑";
-    delBtn.className = "delete-asset-btn";
-    delBtn.onclick = async () => {
-      await delete_asset(asset.name);
-      imageAssets.delete(asset.name);
-      allAssets = allAssets.filter((a) => a.name !== asset.name);
-      renderAssetList();
-    };
-    li.appendChild(delBtn);
-    assetList.appendChild(li);
-  });
-}
-btnAssets.addEventListener("click", () => {
-  renderAssetList();
-  assetModal.style.display = "flex";
-});
-
-btnCloseAssets.addEventListener("click", () => {
-  assetModal.style.display = "none";
+btnFullscreen.addEventListener("click", () => {
+  if (!document.fullscreenElement) {
+    canvasWrapper.requestFullscreen().catch(err => {
+      console.error(`Error attempting to enable fullscreen: ${err.message}`);
+    });
+  } else {
+    document.exitFullscreen();
+  }
 });
 
 assetInput.addEventListener("change", async (e) => {
+  if (!PROJECT_ID) return;
   const files = (e.target as HTMLInputElement).files;
   if (!files) return;
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const reader = new FileReader();
-
-    // Read the file as a robust base64 DataURL
     reader.onload = async () => {
       const asset = {
+        id: `${PROJECT_ID}_${file.name}`,
+        project_id: PROJECT_ID,
         name: file.name,
         type: file.type,
         data: reader.result as string,
       };
-      await save_asset(asset);
+      await save_asset(PROJECT_ID, file.name, file.type, reader.result as string);
       allAssets.push(asset);
       await loadAssetIntoMemory(asset);
-      renderAssetList();
+      renderSidebar();
     };
     reader.readAsDataURL(file);
   }
-  assetInput.value = ""; // Reset input so same file can trigger change again
+  assetInput.value = "";
 });
 
-btnRun.addEventListener("click", executeCode);
-btnStop.addEventListener("click", stop_engine);
-btnSave.addEventListener("click", () => {
-  if (!editorView) return;
-  const code = editorView.state.doc.toString();
-  const blob = new Blob([code], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-
-  a.href = url;
-  a.download = "program.basic";
-  document.body.appendChild(a);
-  a.click();
-
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-});
 inputFile.addEventListener("change", (event) => {
+  if (!PROJECT_ID) return;
   const input = event.target as HTMLInputElement;
-  let file: File | null = null;
-  if (input !== null && input.files !== null) {
-    file = input.files[0];
-    if (!file.type.startsWith("text"))
-      errorDisplay.textContent = "File must be a text file";
-  }
-
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
   const reader = new FileReader();
-  reader.onload = () => {
-    console.log("loaded");
+
+  reader.onload = async () => {
     const result = reader.result;
-    if (result === null) return;
     if (typeof result === "string") {
-      editorContainer.innerHTML = "";
-      editorView = createEditor(editorContainer, result, executeCode);
-      compile_and_run(result);
+      let filename = file.name;
+      if (!filename.endsWith(".basic")) filename += ".basic";
+
+      if (allFiles.some(f => f.filename === filename)) {
+        alert(`A script named ${filename} already exists in this project!`);
+        return;
+      }
+
+      await save_file(PROJECT_ID, filename, result);
+      allFiles.push({
+        id: `${PROJECT_ID}_${filename}`,
+        project_id: PROJECT_ID,
+        filename,
+        content: result
+      });
+
+      await switchFile(filename);
     }
   };
 
@@ -343,56 +519,81 @@ inputFile.addEventListener("change", (event) => {
     errorDisplay.textContent = "Failed loading the text file";
     errorDisplay.style.display = "flex";
   };
-  reader.onabort = () => {
-    errorDisplay.textContent = "Failed loading the text file";
-    errorDisplay.style.display = "flex";
-  };
 
-  if (file !== null) reader.readAsText(file);
-  else {
-    errorDisplay.textContent = "Failed loading the text file";
-    errorDisplay.style.display = "flex";
+  reader.readAsText(file);
+  input.value = "";
+});
+
+// --- Controls & UI ---
+btnRun.addEventListener("click", executeMain);
+btnStop.addEventListener("click", stop_engine);
+
+let isDragging1 = false, isDragging2 = false;
+const div1 = document.getElementById("drag-divider-1") as HTMLElement;
+const div2 = document.getElementById("drag-divider-2") as HTMLElement;
+const sidebarPane = document.getElementById("sidebar-pane") as HTMLElement;
+const editorPane = document.getElementById("editor-pane") as HTMLElement;
+
+// Attach Mouse & Touch start events
+div1.addEventListener("mousedown", () => { isDragging1 = true; });
+div1.addEventListener("touchstart", () => { isDragging1 = true; }, { passive: true });
+
+div2.addEventListener("mousedown", () => { isDragging2 = true; canvasWrapper.style.pointerEvents = "none"; });
+div2.addEventListener("touchstart", () => { isDragging2 = true; canvasWrapper.style.pointerEvents = "none"; }, { passive: true });
+
+// Universal movement handler
+const handleMove = (clientX: number, clientY: number) => {
+  const isMobile = window.innerWidth <= 768;
+
+  if (isDragging1) {
+    if (isMobile) {
+      const topOffset = document.getElementById("top-bar")?.clientHeight || 56;
+      const newHeight = Math.max(100, Math.min(clientY - topOffset, window.innerHeight * 0.4));
+      sidebarPane.style.flex = `0 0 ${newHeight}px`;
+    } else {
+      const newWidth = Math.max(150, Math.min(clientX, window.innerWidth * 0.4));
+      sidebarPane.style.flex = `0 0 ${newWidth}px`;
+    }
   }
-});
+  else if (isDragging2) {
+    if (isMobile) {
+      const workspaceHeight = document.getElementById("workspace")!.clientHeight;
+      const sidebarHeight = sidebarPane.clientHeight;
+      const remainingHeight = workspaceHeight - sidebarHeight;
+      const topOffset = document.getElementById("top-bar")?.clientHeight || 56;
 
-// --- Toggle Editor ---
-let isEditorOpen = true;
-btnToggleEditor.addEventListener("click", () => {
-  isEditorOpen = !isEditorOpen;
-  editorPane.style.display = isEditorOpen ? "flex" : "none";
-  dragDivider.style.display = isEditorOpen ? "block" : "none";
-  btnToggleEditor.textContent = isEditorOpen ? "◀ EDITOR" : "▶ EDITOR";
-  resizeCanvas(); // Trigger paint recalibration
-});
+      const newBasis = ((clientY - topOffset - sidebarHeight) / remainingHeight) * 100;
+      if (newBasis > 10 && newBasis < 90) {
+        editorPane.style.flex = `0 0 ${newBasis}%`;
+        resizeCanvas();
+      }
+    } else {
+      const workspaceWidth = document.getElementById("workspace")!.clientWidth;
+      const sidebarWidth = sidebarPane.clientWidth;
+      const remainingWidth = workspaceWidth - sidebarWidth;
 
-// --- Resizer / Drag Divider ---
-let isDragging = false;
-
-dragDivider.addEventListener("mousedown", () => {
-  isDragging = true;
-  dragDivider.classList.add("dragging");
-  document.body.style.cursor = "col-resize";
-  document.body.style.userSelect = "none";
-  canvasWrapper.style.pointerEvents = "none"; // Stop iframe/canvas from swallowing pointer events
-});
+      const newBasis = ((clientX - sidebarWidth) / remainingWidth) * 100;
+      if (newBasis > 10 && newBasis < 90) {
+        editorPane.style.flex = `0 0 ${newBasis}%`;
+        resizeCanvas();
+      }
+    }
+  }
+};
 
 window.addEventListener("mousemove", (e) => {
-  if (!isDragging) return;
-  const workspaceWidth = document.getElementById("workspace")!.clientWidth;
-  const newBasis = (e.clientX / workspaceWidth) * 100;
-  // Constrain the editor pane between 5% and 95% of the screen
-  if (newBasis > 5 && newBasis < 95) {
-    editorPane.style.flex = `0 0 ${newBasis}%`;
-    resizeCanvas();
-  }
+  if (isDragging1 || isDragging2) handleMove(e.clientX, e.clientY);
 });
 
-window.addEventListener("mouseup", () => {
-  if (isDragging) {
-    isDragging = false;
-    dragDivider.classList.remove("dragging");
-    document.body.style.cursor = "default";
-    document.body.style.userSelect = "";
-    canvasWrapper.style.pointerEvents = "auto";
-  }
+window.addEventListener("touchmove", (e) => {
+  if (isDragging1 || isDragging2) handleMove(e.touches[0].clientX, e.touches[0].clientY);
 });
+
+const handleUp = () => {
+  isDragging1 = false;
+  isDragging2 = false;
+  canvasWrapper.style.pointerEvents = "auto";
+};
+
+window.addEventListener("mouseup", handleUp);
+window.addEventListener("touchend", handleUp);
