@@ -543,7 +543,7 @@ div2.addEventListener("touchstart", () => { isDragging2 = true; canvasWrapper.st
 
 // Universal movement handler
 const handleMove = (clientX: number, clientY: number) => {
-  const isMobile = window.innerWidth <= 768;
+  const isMobile = window.innerWidth <= 600;
 
   if (isDragging1) {
     if (isMobile) {
@@ -597,3 +597,36 @@ const handleUp = () => {
 
 window.addEventListener("mouseup", handleUp);
 window.addEventListener("touchend", handleUp);
+
+// --- Collapsible UI Logic ---
+
+// 1. Accordion logic for Assets and Scripts
+document.querySelectorAll('.section-header').forEach(header => {
+  header.addEventListener('click', (e) => {
+    // Don't collapse if they clicked the + or upload buttons
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.tagName === 'LABEL') return;
+    
+    const treeList = header.nextElementSibling as HTMLElement;
+    // Skip over the hidden file input if clicking the Scripts header
+    const actualTree = treeList.tagName === 'INPUT' ? treeList.nextElementSibling as HTMLElement : treeList;
+
+    if (actualTree && actualTree.classList.contains('tree-list')) {
+      actualTree.style.display = actualTree.style.display === 'none' ? 'block' : 'none';
+    }
+  });
+});
+
+// 2. Master Sidebar Toggle
+const btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
+let isSidebarOpen = true;
+
+if (btnToggleSidebar) {
+  btnToggleSidebar.addEventListener("click", () => {
+    isSidebarOpen = !isSidebarOpen;
+    sidebarPane.style.display = isSidebarOpen ? "flex" : "none";
+    div1.style.display = isSidebarOpen ? "block" : "none";
+    resizeCanvas();
+  });
+}
+

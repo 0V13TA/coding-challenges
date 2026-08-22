@@ -306,7 +306,11 @@ body {
   font-weight: bold;
   color: var(--text-muted);
   letter-spacing: 1px;
+  cursor: pointer; /* NEW: Indicate it is clickable */
+  user-select: none;
 }
+
+.section-header:hover { color: var(--text-main); }
 
 .icon-btn {
   background: transparent;
@@ -386,9 +390,8 @@ body {
   opacity: 1;
 }
 
-
-/* --- Responsive Adjustments --- */
-@media (max-width: 768px) {
+/* --- Responsive Adjustments (Play Mode Only) --- */
+@media (max-width: 600px) {
   .brand {
     display: none;
   }
@@ -402,8 +405,7 @@ body {
     overflow-x: auto;
     white-space: nowrap;
     justify-content: flex-start;
-    padding-bottom: 4px;
-    /* Room for scrollbar */
+    padding-bottom: 4px; /* Room for scrollbar */
   }
 
   .control-btn {
@@ -416,30 +418,18 @@ body {
     flex-direction: column;
   }
 
-  #sidebar-pane {
-    flex: 0 0 200px !important;
-    border-right: none;
-    border-bottom: var(--ui-border);
-    width: 100%;
-  }
-
-  /* Flip dividers to horizontal */
+  /* Completely hide the IDE panels on small screens */
+  #sidebar-pane,
+  #editor-pane,
   .drag-divider {
-    width: 100%;
-    height: 12px;
-    /* Thicker for touch targets */
-    cursor: row-resize;
+    display: none !important;
   }
 
-  #editor-pane {
-    border-right: none;
-    border-bottom: var(--ui-border);
-    flex: 0 0 35vh !important;
-    width: 100%;
-  }
-
+  /* Force the runtime canvas to take over the screen */
   #canvas-pane {
     flex: 1 !important;
     width: 100%;
+    height: 100%;
+    border-top: var(--ui-border);
   }
 }
