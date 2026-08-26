@@ -115,6 +115,7 @@ const builtinsArray = [
   "HALF_PI",
   "MOUSE_X",
   "MOUSE_Y",
+  "MOUSE_DOWN",
   "SCR_W",
   "SCR_H",
   "HOST_W",

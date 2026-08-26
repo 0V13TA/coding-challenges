@@ -20,6 +20,7 @@ export type Environment = {
 export type RuntimeResult =
   | { status: "running" }
   | { status: "done"; value?: RuntimeValue }
+  | { status: "sync" }
   | { status: "error"; message: string; line?: number; column?: number };
 
 export type Callable = {

@@ -219,12 +219,19 @@ export function* evaluate_program(
           }
         }
         if (break_loop) break;
+
+        // Add this back! It allows the worker to pause execution.
         yield { status: "running" };
       }
       return null;
     }
 
     case "FunctionCall": {
+      if (node.caller === "SYNC") {
+        yield { status: "sync" };
+        return { type: "any", value: null } as RuntimeValue;
+      }
+
       const func_entry = env.functionMap.get(node.caller);
       if (!func_entry) {
         yield { status: "error", message: `Undefined function: ${node.caller}`, line: node.line, column: node.column };

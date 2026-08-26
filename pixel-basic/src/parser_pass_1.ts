@@ -27,7 +27,7 @@ export function define_builtin_functions(
   ctx: CanvasRenderingContext2D,
   keys_down: Set<string>,
   update_env: (name: string, value: any) => void,
-  imageAssets: Map<string, HTMLImageElement>,
+  imageAssets: Map<string, CanvasImageSource>,
 ): Map<string, Callable> {
   const global_symbols = new Map<string, Callable>();
 
@@ -53,6 +53,12 @@ export function define_builtin_functions(
 
   // Helper for void returns
   const VOID: RuntimeValue = { type: "any", value: null };
+
+  global_symbols.set("SYNC", {
+    arity: 0,
+    is_native: true,
+    native_fn: () => VOID,
+  });
 
   // ==========================================
   // Buffer Management API
@@ -375,10 +381,11 @@ export function define_builtin_constants(
   // Initialize dynamic system variables
   global_env.define("MOUSE_X", { type: "i32", value: 0 });
   global_env.define("MOUSE_Y", { type: "i32", value: 0 });
+  global_env.define("MOUSE_DOWN", { type: "bool", value: false });
   global_env.define("SCR_W", { type: "i32", value: scr_wdith });
   global_env.define("SCR_H", { type: "i32", value: scr_height });
-  global_env.define("HOST_W", { type: "i32", value: innerWidth });
-  global_env.define("HOST_H", { type: "i32", value: innerHeight });
+  global_env.define("HOST_W", { type: "i32", value: scr_wdith });
+  global_env.define("HOST_H", { type: "i32", value: scr_height });
 }
 
 export function pass_1_scope_analysis(tokens: Token[], scopes: Scope[]): void {
