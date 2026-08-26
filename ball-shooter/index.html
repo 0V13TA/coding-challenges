@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <title>ball-shooter</title>
+</head>
+
+<body>
+  <div id="app">
+    <div id="scoreContainer">
+      Score: <span id="scoreEl">0</span>
+    </div>
+
+    <div id="gameOverModal">
+      <div id="dialogBox">
+        <h2>Game Over</h2>
+        <p>Final Score: <span id="finalScoreEl">0</span></p>
+        <p id="highScoreIndicator" class="hidden">✨ New High Score! ✨</p>
+        <button id="restartButton">Restart Game</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

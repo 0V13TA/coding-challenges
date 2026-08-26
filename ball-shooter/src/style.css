@@ -1,0 +1,110 @@
+/* Define theme colors */
+:root {
+  --game-bg: #0a0a0a;
+  /* Very dark gray */
+  --game-primary: #00ff41;
+  /* Bright green */
+  --game-secondary: #008f11;
+  /* Darker green */
+  --game-highlight: #ffff00;
+  /* Yellow for high score */
+  --font-game: 'Press Start 2P', monospace;
+  /* Game font */
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  overflow: hidden;
+  background-color: var(--game-bg);
+  font-family: var(--font-game);
+}
+
+/* Score Display (Top Left) */
+#scoreContainer {
+  position: fixed;
+  /* Stays in place */
+  top: 20px;
+  left: 20px;
+  color: var(--game-primary);
+  font-size: 1.2rem;
+  text-shadow: 0 0 5px var(--game-primary);
+}
+
+/* Game Over Modal (Hidden by default) */
+#gameOverModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  /* Dark overlay */
+  display: none;
+  /* Changed to 'flex' by JS */
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+/* The actual dialog box */
+#dialogBox {
+  background-color: var(--game-bg);
+  color: var(--game-primary);
+  border: 4px solid var(--game-primary);
+  box-shadow: 0 0 20px var(--game-primary);
+  padding: 30px;
+  width: 90%;
+  max-width: 500px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  /* Adds space between elements */
+}
+
+#dialogBox h2 {
+  font-size: 2rem;
+  text-transform: uppercase;
+}
+
+#dialogBox p {
+  font-size: 1.2rem;
+}
+
+/* High Score Indicator */
+#highScoreIndicator {
+  color: var(--game-highlight);
+  /* Bright yellow */
+  font-size: 1.3rem;
+  text-shadow: 0 0 10px var(--game-highlight);
+}
+
+/* Utility class to hide/show the high score */
+.hidden {
+  display: none;
+}
+
+/* Restart Button */
+#restartButton {
+  font-family: var(--font-game);
+  font-size: 1rem;
+  background-color: var(--game-primary);
+  color: var(--game-bg);
+  border: 2px solid var(--game-secondary);
+  padding: 15px 20px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+#restartButton:hover {
+  background-color: var(--game-bg);
+  color: var(--game-primary);
+  border-color: var(--game-primary);
+  box-shadow: 0 0 15px var(--game-primary);
+}
