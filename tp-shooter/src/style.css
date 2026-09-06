@@ -1,0 +1,21 @@
+:root {
+  --background_color: #003300;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  overflow: none;
+  box-sizing: border-box;
+}
+
+body {
+  color: #fff;
+  background: var(--background_color);
+  overflow: hidden;
+  font-family: "Press Start 2P", cursive;
+}
+
+canvas {
+  background: var(--background_color);
+}
