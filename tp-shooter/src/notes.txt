@@ -1,0 +1,40 @@
+# Top Down shooter like 1942 game from capcom
+
+## Components
+  - [x] Enemy Component
+  - [x] Bullet Component
+  - [x] Render Component
+  - [x] Health Component
+  - [x] Pickup Component
+  - [x] Effect Component
+  - [x] Inventory Component
+  - [x] Transform Component
+
+## Entities
+
+### Enemy Entity
+  - Enemy Component
+  - Render Component
+  - Health Component
+  - Transform Component
+
+### Player Entity
+  - Render Component
+  - Effect Component
+  - Health Component
+  - Transform Component
+  - Inventory Component
+
+### Bullet Entity
+  - Bullet Component
+  - Render Component
+  - Transform Component
+
+### Pickup Entity
+  - Pickup Component
+  - Transform Component
+  - Render Component
+
+## Systems
+
+ 
